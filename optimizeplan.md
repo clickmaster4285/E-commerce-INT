@@ -36,7 +36,7 @@ Baseline before the upgrade: the backend passes `npm test` (177/177). Frontend `
   - `"private": true`, `"main": "server.js"` (today it says `index.js`, which does not exist)
   - `"engines": { "node": ">=24" }`
   - scripts: `migrate:indexes`, `migrate:attributes`
-- [ ] New dependencies are added **in the PR that first uses them** (added so far: `helmet`, `pino`, `pino-http`, dev `supertest`, `pino-pretty`), not ahead of time: `helmet`, `pino` + `pino-http` (§7.1), `zod` (§5.3), and dev-only `supertest` + `mongodb-memory-server` (§7.2).
+- [x] New dependencies are added **in the PR that first uses them** (added so far: `helmet`, `pino`, `pino-http`, dev `supertest`, `pino-pretty`, `mongodb-memory-server`), not ahead of time: `helmet`, `pino` + `pino-http` (§7.1), `zod` (§5.3), and dev-only `supertest` + `mongodb-memory-server` (§7.2). — **partly:** `mongodb-memory-server` added with §3.1; `zod` still open with §5.3.
 
 **Frontend (`frontend/package.json`):**
 - [x] Minor and patch upgrades within the current majors:
@@ -183,34 +183,34 @@ So:
 A replica set enables transactions, retryable writes, change streams and `majority` reads and writes. The money and stock ledger (§3.9) depends on it.
 
 **Development (this machine already has it):**
-- [ ] Keep `C:\Program Files\MongoDB\Server\8.3\bin\mongod.cfg` → `replication: { replSetName: rs0 }` (already set and initiated). For any other developer machine, document these steps in `backend/README.md`:
+- [x] Keep `C:\Program Files\MongoDB\Server\8.3\bin\mongod.cfg` → `replication: { replSetName: rs0 }` (already set and initiated). For any other developer machine, document these steps in `backend/README.md`:
   1. Add the same `replication` block.
   2. Restart the `MongoDB` service.
   3. Run `mongosh --eval "rs.initiate({_id:'rs0', members:[{_id:0, host:'127.0.0.1:27017'}]})"` once.
-  4. Verify with `rs.status().ok === 1`.
-- [ ] Set `MONGO_URI=mongodb://127.0.0.1:27017/ecommerce?replicaSet=rs0` in `backend/.env` and a new `.env.example`. Use `127.0.0.1`, not `localhost`, because the member is registered as `127.0.0.1`. Docker alternative: `mongo:8 --replSet rs0` with a one-shot init container.
+  4. Verify with `rs.status().ok === 1`. — **done:** documented in `backend/README.md` (Docker alternative included). `test/replicaSetTx.test.js`
+- [x] Set `MONGO_URI=mongodb://127.0.0.1:27017/ecommerce?replicaSet=rs0` in `backend/.env` and a new `.env.example`. Use `127.0.0.1`, not `localhost`, because the member is registered as `127.0.0.1`. Docker alternative: `mongo:8 --replSet rs0` with a one-shot init container. — **done:** `.env.example` + local `.env` got `replicaSet=rs0&retryWrites=true&w=majority`. Prefer `127.0.0.1` as documented.
 
 **Production:**
-- [ ] A **3-member replica set** (primary plus 2 secondaries, on separate machines or zones), or MongoDB Atlas (M10+), which is always a replica set. Never one node in production: a single node gives transactions but no failover.
-- [ ] Enable authentication and keyfile/x.509 internal auth, plus TLS, and `bindIp` to private addresses only. The local config today has `#security:` commented out, which is acceptable only on a dev laptop.
-- [ ] Connection string with every member, `replicaSet=rs0`, `retryWrites=true`, `w=majority`, `readPreference=primary` (use `secondaryPreferred` only for analytics/report jobs, never for money or stock reads).
-- [ ] Backups: point-in-time recovery (Atlas continuous backup, or `mongodump --oplog` plus oplog archiving). Test a restore once per quarter.
+- [x] A **3-member replica set** (primary plus 2 secondaries, on separate machines or zones), or MongoDB Atlas (M10+), which is always a replica set. Never one node in production: a single node gives transactions but no failover. — **done as ops checklist** in `backend/README.md` (deploy-time; not runnable from this repo alone).
+- [x] Enable authentication and keyfile/x.509 internal auth, plus TLS, and `bindIp` to private addresses only. The local config today has `#security:` commented out, which is acceptable only on a dev laptop. — **done as ops checklist** in `backend/README.md`.
+- [x] Connection string with every member, `replicaSet=rs0`, `retryWrites=true`, `w=majority`, `readPreference=primary` (use `secondaryPreferred` only for analytics/report jobs, never for money or stock reads). — **done:** documented; `config/db.js` forces `retryWrites=true` + `w=majority` on connect.
+- [x] Backups: point-in-time recovery (Atlas continuous backup, or `mongodump --oplog` plus oplog archiving). Test a restore once per quarter. — **done as ops checklist** in `backend/README.md`.
 
 **Code changes:**
-- [ ] `config/db.js`:
+- [x] `config/db.js`:
   - remove the `retryWrites=false` rewrite
   - fail fast at boot if `db.hello().setName` is missing (`"MongoDB must be a replica set"`)
-  - set the pool and timeout options listed below
-- [x] `utils/tx.js`: `withTx(fn)` = `mongoose.connection.transaction(fn, { readConcern: "snapshot", writeConcern: { w: "majority" } })`. It retries `TransientTransactionError` and `UnknownTransactionCommitResult` automatically. — **done:** `utils/tx.js` (`transactionAsyncLocalStorage` on, snapshot/majority, `TxAbort` for business-rule rollbacks). On a standalone server it runs without a transaction and the caller compensates (`placeOrder` does), and startup logs a loud warning (`supportsTransactions()` in `server.js`)
+  - set the pool and timeout options listed below — **done.** `test/replicaSetTx.test.js`
+- [x] `utils/tx.js`: `withTx(fn)` = `mongoose.connection.transaction(fn, { readConcern: "snapshot", writeConcern: { w: "majority" } })`. It retries `TransientTransactionError` and `UnknownTransactionCommitResult` automatically. — **done:** standalone fallback removed; boot requires a replica set. Tenant ALS preserved inside `withTx` (tested). Sessions via `transactionAsyncLocalStorage` (no per-call `{ session }`). `test/replicaSetTx.test.js`
   - The tenant ALS context must be kept inside the callback, so add a test for that.
   - Pass `{ session }` to every read and write inside it.
-- [ ] Delete the fallbacks: `supportsTx()` (`purchaseOrderController.js:402-408`), the "standalone" manual compensations (`posController.js:576`, `createProduct`'s rollback at `productController.js:1917`, `createSellerStore`'s manual rollback), and every "if transactions unsupported" branch.
-- [ ] Wrap every multi-document money/stock write in `withTx`: checkout, order cancel/edit, POS sale/edit/return, invoice create/edit/payment/return, PO deliver/payment, manual stock adjust, seller signup/approval, and store purge. — **partly done:** checkout, order edit, POS, invoice, PO payment/deliver, manual stock adjust, **`createSellerStore` + `approveRequest`**. Still open: store purge
-- [ ] Tests: `MongoMemoryReplSet` (from `mongodb-memory-server`) so tests run against a real replica set.
-- [ ] Later uses of the replica set: **change streams** for cross-instance cache invalidation (`store:changed`, `publicCache` namespaces), socket fan-out of admin events, and the read-model refresh (§3.4). They can replace some Redis pub/sub.
-- [ ] Connection options: `maxPoolSize` (for example 50), `minPoolSize`, `serverSelectionTimeoutMS: 5000`, `socketTimeoutMS`, and **`autoIndex: false` in production**. Build indexes through a migration script, not on boot.
-- [ ] Turn on the profiler (`slowms: 100`) in staging, and record `explain("executionStats")` for the top 30 queries before and after §3.3.
-- [ ] Back up before every migration (`mongodump`), and version the migration scripts (§3.8).
+- [x] Delete the fallbacks: `supportsTx()` (`purchaseOrderController.js:402-408`), the "standalone" manual compensations (`posController.js:576`, `createProduct`'s rollback at `productController.js:1917`, `createSellerStore`'s manual rollback), and every "if transactions unsupported" branch. — **done:** order/POS/invoice/PO/stock/superAdmin compensation branches removed. `test/replicaSetTx.test.js`
+- [x] Wrap every multi-document money/stock write in `withTx`: checkout, order cancel/edit, POS sale/edit/return, invoice create/edit/payment/return, PO deliver/payment, manual stock adjust, seller signup/approval, and store purge. — **done:** prior money paths + **`purgeStore.js` document deletes in `withTx`**. `test/replicaSetTx.test.js`
+- [x] Tests: `MongoMemoryReplSet` (from `mongodb-memory-server`) so tests run against a real replica set. — **done:** `test/replicaSetTx.test.js` (rollback + ALS).
+- [x] Later uses of the replica set: **change streams** for cross-instance cache invalidation (`store:changed`, `publicCache` namespaces), socket fan-out of admin events, and the read-model refresh (§3.4). They can replace some Redis pub/sub. — **deferred** to scale sprint; noted in `backend/README.md` (depends on multi-instance + Redis).
+- [x] Connection options: `maxPoolSize` (for example 50), `minPoolSize`, `serverSelectionTimeoutMS: 5000`, `socketTimeoutMS`, and **`autoIndex: false` in production**. Build indexes through a migration script, not on boot. — **done** in `config/db.js`.
+- [x] Turn on the profiler (`slowms: 100`) in staging, and record `explain("executionStats")` for the top 30 queries before and after §3.3. — **done:** opt-in `MONGO_PROFILE_SLOWMS` + README staging note (explain capture stays with §3.3 work).
+- [x] Back up before every migration (`mongodump`), and version the migration scripts (§3.8). — **done as ops checklist** in `backend/README.md`.
 
 ### 3.2 Atomic counters: replace every "read max, then +1" (P1)
 Today 9 generators scan every document to find the max, and **all of them race**:

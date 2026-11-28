@@ -28,7 +28,7 @@ const log = require("../utils/logger");
 const { pushStoreActivity, getChanges } = require("../utils/activityHelper");
 // approveRequest aur createSellerStore dono ko chahiye (pehle sirf createSellerStore ke andar tha → approve par ReferenceError)
 const { uniqueUsername } = require("../utils/username");
-const { withTx, TxAbort, supportsTransactions } = require("../utils/tx");
+const { withTx, TxAbort } = require("../utils/tx");
 
 // Best-effort seller notification — delivery failure must never reverse a decision
 const notifySeller = async (sendFn, payload, action, entityId) => {
@@ -482,9 +482,7 @@ const deleteRequest = async (req, res) => {
 const approveRequest = async (req, res) => {
   try {
     let openStoreId = null;
-    let applicationSnap = null;
-    const transactional = await supportsTransactions();
-    let claimedAppId = null;
+    let applicationSnap = null;    let claimedAppId = null;
     try {
       ({ result: { openStoreId, applicationSnap } } = await withTx(async () => {
         // Atomic guard: only flip pending → approved once (inside withTx, §5.4)
@@ -557,9 +555,6 @@ const approveRequest = async (req, res) => {
         };
       }));
     } catch (txError) {
-      if (!transactional && claimedAppId) {
-        await SellerApplication.updateOne({ _id: claimedAppId, status: "approved" }, { status: "pending" }).catch(() => {});
-      }
       if (txError instanceof TxAbort) return res.status(txError.status).json(txError.body);
       throw txError;
     }
@@ -895,9 +890,7 @@ const createSellerStore = async (req, res) => {
     }
 
     const username = usernameIn || (await uniqueUsername(name, email, { excludeEmail: email }));
-    const passwordHash = await bcrypt.hash(password, 10);
-    const transactional = await supportsTransactions();
-    let created = {};
+    const passwordHash = await bcrypt.hash(password, 10);    let created = {};
     try {
       ({ result: created } = await withTx(async () => {
         created = {};
@@ -939,13 +932,6 @@ const createSellerStore = async (req, res) => {
         return created;
       }));
     } catch (err) {
-      if (!transactional) {
-        await Promise.allSettled([
-          created.application && SellerApplication.deleteOne({ _id: created.application._id }),
-          created.employee && Employee.deleteOne({ _id: created.employee._id }).setOptions(CROSS_STORE),
-          created.store && Store.deleteOne({ _id: created.store._id }).setOptions(CROSS_STORE),
-        ]);
-      }
       if (err?.code === 11000) {
         const key = Object.keys(err.keyPattern || err.keyValue || {}).find((k) => k !== "storeId") || "";
         const field = key === "subdomain" ? "subdomain" : key === "username" ? "username" : key === "phone" ? "phone" : "email";

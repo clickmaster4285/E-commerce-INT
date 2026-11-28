@@ -3,19 +3,14 @@
 // ----------------------------------------------------------
 //   const { result, transactional } = await withTx(async () => { ...writes... });
 //
-// • MongoDB replica set chahiye (local dev: rs0 single node — pehle se hai).
-//   Production bhi replica set (3 nodes / Atlas) honi chahiye.
-// • `transactionAsyncLocalStorage`: callback ke andar HAR Mongoose query/
-//   save khud transaction session use karti hai — `{ session }` har jagah
-//   pass karne ki zaroorat nahi. Tenant (storeId) ALS alag hai, dono saath chalte hain.
-// • Driver TransientTransactionError / WriteConflict par callback DOBARA chalata
-//   hai — is liye callback ke andar in-memory state shuru me reset karo.
-// • Business rule fail (stock khatam, deal limit) → `throw new TxAbort(status, body)`
-//   → sab rollback; caller `err instanceof TxAbort` par wahi response bhejta hai.
-// • STANDALONE fallback: agar server replica set nahi (transactions supported
-//   nahi), callback bina transaction chalta hai aur `transactional: false`
-//   lautata hai — caller apna compensation (stock wapas) khud kare. Startup
-//   log me bari warning aati hai. Ye sirf purane deployments ke liye hai.
+// • MongoDB MUST be a replica set — config/db.js fails boot otherwise.
+//   Standalone fallback / manual compensation paths are gone.
+// • `transactionAsyncLocalStorage`: har Mongoose query/save andar session
+//   use karti hai — `{ session }` har jagah pass karne ki zaroorat nahi.
+//   Tenant (storeId) ALS alag hai; dono saath chalte hain (tested).
+// • Driver TransientTransactionError / WriteConflict par callback DOBARA
+//   chalata hai — in-memory state callback ke shuru me reset karo.
+// • Business rule fail → `throw new TxAbort(status, body)` → poora rollback.
 // ==========================================================
 const mongoose = require("mongoose");
 const log = require("./logger");
@@ -32,6 +27,8 @@ class TxAbort extends Error {
 }
 
 let supportCache = null; // Promise<boolean>
+
+/** True when connected to a replica set / mongos. Boot already requires this. */
 async function supportsTransactions() {
   if (!supportCache) {
     supportCache = (async () => {
@@ -42,21 +39,19 @@ async function supportsTransactions() {
         return false;
       }
     })();
-    supportCache.then((ok) => {
-      if (!ok) {
-        const msg = "MongoDB is NOT a replica set — checkout runs WITHOUT transactions (compensation only). Configure a replica set (optimizeplan.md §3.1).";
-        log.error(msg);
-        console.warn(`⚠️  ${msg}`);
-      }
-    });
   }
   return supportCache;
 }
 
-/** @returns {Promise<{ result: any, transactional: boolean }>} */
+/**
+ * Run `fn` inside a snapshot/majority transaction.
+ * @returns {Promise<{ result: any, transactional: true }>}
+ */
 async function withTx(fn) {
   if (!(await supportsTransactions())) {
-    return { result: await fn(), transactional: false };
+    const msg = "MongoDB must be a replica set for withTx (optimizeplan.md §3.1)";
+    log.error(msg);
+    throw new Error(msg);
   }
   const result = await mongoose.connection.transaction(fn, {
     readConcern: { level: "snapshot" },

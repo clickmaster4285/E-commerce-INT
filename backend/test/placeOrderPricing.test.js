@@ -154,18 +154,4 @@ test("second line out of stock → whole order rolled back (first line's stock u
   assert.equal(await ordersCount(), before);
 });
 
-test("standalone MongoDB fallback (no transactions): failed order still gives stock back", async (t) => {
-  if (!ctx) return t.skip("MongoDB not reachable");
-  const tx = require("../utils/tx");
-  tx._forceTxSupportForTests(false);
-  try {
-    const kettleBefore = await stockOf(ctx.variantId);
-    const mug = { id: String(ctx.mugId), variant_id: String(ctx.mugVariantId), name: "Mug", qty: 1, price: 200, displayPrice: 200 };
-    const res = await place([line(), mug, mug]);
-    assert.equal(res.status, 400, JSON.stringify(res.body));
-    assert.equal(await stockOf(ctx.variantId), kettleBefore, "kettle stock compensated");
-    assert.equal(await stockOf(ctx.mugVariantId), 1, "mug stock compensated");
-  } finally {
-    tx._resetTxSupportCache();
-  }
-});
+// Standalone MongoDB fallback removed (§3.1) — see replicaSetTx.test.js

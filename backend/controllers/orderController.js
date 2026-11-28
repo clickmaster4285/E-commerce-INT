@@ -11,7 +11,7 @@ const discountController = require("./discountController");
 const log = require("../utils/logger");
 const { nextSeq, ensureSeeded, formatNumber, maxNumericSuffix } = require("../utils/counter");
 const { priceCheckout } = require("../services/pricing/checkout"); // server-side cart pricing
-const { withTx, TxAbort, supportsTransactions } = require("../utils/tx"); // one transaction per checkout
+const { withTx, TxAbort } = require("../utils/tx"); // one transaction per checkout
 const calculateDiscountedPrice = discountController.calculateDiscountedPrice;
 
 const emitOrderEvent = (event, data) => {
@@ -386,7 +386,6 @@ const placeOrder = async (req, res) => {
       orderItems.map((oi) => oi.discount_id).filter(Boolean).map(String),
     );
     let order;
-    const transactional = await supportsTransactions();
     try {
       ({ result: order } = await withTx(async () => {
         stockTouchedOnOrder = []; // driver retry par callback dobara chalta hai
@@ -505,18 +504,6 @@ const placeOrder = async (req, res) => {
         return created;
       }));
     } catch (txError) {
-      // Standalone MongoDB (no transactions): jo liya tha wapas do (compensation)
-      if (!transactional) {
-        for (const t of stockTouchedOnOrder) {
-          await Variant.updateOne({ _id: t.variant_id }, { $inc: { quantity: -t.change } }).catch(() => {});
-        }
-        for (const dId of dealsIncremented) {
-          await Deal.updateOne({ _id: dId, usedCount: { $gt: 0 } }, { $inc: { usedCount: -1 } }).catch(() => {});
-        }
-        for (const discId of discountsIncremented) {
-          await Discount.updateOne({ _id: discId, usageCount: { $gt: 0 } }, { $inc: { usageCount: -1 } }).catch(() => {});
-        }
-      }
       if (txError instanceof TxAbort) return res.status(txError.status).json(txError.body);
       // Do concurrent submits same Idempotency-Key ke sath → doosra unique index par
       // fail; pehle wala order hi lautao (double order nahi).
@@ -1275,7 +1262,6 @@ const editOrder = async (req, res) => {
     // 🔒 Stock delta + order update ek transaction. Doosri request same updated_at
     // par fail (409) — warna dono qty barha kar stock do dafa kaat leti.
     const seenUpdatedAt = order.updated_at;
-    const transactional = await supportsTransactions();
     const applied = [];
     let saved;
     try {
@@ -1305,11 +1291,6 @@ const editOrder = async (req, res) => {
         return updated;
       }));
     } catch (txError) {
-      if (!transactional) {
-        for (const row of applied) {
-          await Variant.updateOne({ _id: row.variant_id }, { $inc: { quantity: -row.change } }).catch(() => {});
-        }
-      }
       if (txError instanceof TxAbort) return res.status(txError.status).json(txError.body);
       throw txError;
     }

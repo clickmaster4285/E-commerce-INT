@@ -6,6 +6,9 @@
 //   node scripts/purgeStore.js --storeId <ObjectId>           → dry run
 //   node scripts/purgeStore.js --storeId <ObjectId> --apply   → delete docs + uploads
 //   ... --apply --hard-store                                 → Store doc bhi hatao
+//
+// APPLY deletes run inside withTx (§3.1) so a mid-purge failure rolls back
+// document deletes. Uploads folder is removed only after the transaction commits.
 // ==========================================================
 const path = require("path");
 const fs = require("fs");
@@ -13,6 +16,7 @@ require("dotenv").config({ path: path.join(__dirname, "..", ".env"), quiet: true
 
 const mongoose = require("mongoose");
 const connectDB = require("../config/db");
+const { withTx } = require("../utils/tx");
 const { UPLOAD_ROOT } = require("../utils/uploadPaths");
 
 const APPLY = process.argv.includes("--apply");
@@ -56,28 +60,35 @@ const STORE_ID_RAW = idIdx > -1 ? process.argv[idIdx + 1] : null;
     if (Model.schema.$tenantScopeField !== "storeId") continue;
     const count = await Model.countDocuments(filter).setOptions({ skipTenantScope: true });
     if (!count) continue;
-    summary.push({ name, collection: Model.collection.name, count });
-    if (APPLY) {
-      const result = await Model.deleteMany(filter).setOptions({ skipTenantScope: true });
-      console.log(`  deleted ${result.deletedCount} from ${name} (${Model.collection.name})`);
-    } else {
-      console.log(`  would delete ${count} from ${name} (${Model.collection.name})`);
-    }
+    summary.push({ name, collection: Model.collection.name, count, Model });
   }
 
-  // RefreshSession is not tenantScope-plugin'd but carries storeId
   if (mongoose.modelNames().includes("RefreshSession")) {
     const RefreshSession = mongoose.model("RefreshSession");
     const count = await RefreshSession.countDocuments(filter);
     if (count) {
-      summary.push({ name: "RefreshSession", collection: RefreshSession.collection.name, count });
-      if (APPLY) {
-        const result = await RefreshSession.deleteMany(filter);
-        console.log(`  deleted ${result.deletedCount} from RefreshSession`);
-      } else {
-        console.log(`  would delete ${count} from RefreshSession`);
-      }
+      summary.push({ name: "RefreshSession", collection: RefreshSession.collection.name, count, Model: RefreshSession, skipTenant: true });
     }
+  }
+
+  if (APPLY) {
+    await withTx(async () => {
+      for (const row of summary) {
+        const result = row.skipTenant
+          ? await row.Model.deleteMany(filter)
+          : await row.Model.deleteMany(filter).setOptions({ skipTenantScope: true });
+        console.log(`  deleted ${result.deletedCount} from ${row.name} (${row.collection})`);
+      }
+      if (HARD_STORE) {
+        await Store.deleteOne({ _id: storeId }).setOptions({ skipTenantScope: true });
+        console.log("  hard-deleted Store document");
+      }
+    });
+  } else {
+    for (const row of summary) {
+      console.log(`  would delete ${row.count} from ${row.name} (${row.collection})`);
+    }
+    if (HARD_STORE) console.log("  would hard-delete Store document");
   }
 
   const uploadDir = path.join(UPLOAD_ROOT, "stores", String(storeId));
@@ -90,15 +101,6 @@ const STORE_ID_RAW = idIdx > -1 ? process.argv[idIdx + 1] : null;
     }
   } else {
     console.log(`  no uploads folder at ${uploadDir}`);
-  }
-
-  if (HARD_STORE) {
-    if (APPLY) {
-      await Store.deleteOne({ _id: storeId }).setOptions({ skipTenantScope: true });
-      console.log("  hard-deleted Store document");
-    } else {
-      console.log("  would hard-delete Store document");
-    }
   }
 
   const total = summary.reduce((n, row) => n + row.count, 0);

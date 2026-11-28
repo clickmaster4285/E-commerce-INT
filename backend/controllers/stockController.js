@@ -6,7 +6,7 @@ const { getIO } = require("../utils/socket");
 const {
   pushGlobalActivity,
 } = require("../utils/activityHelper");
-const { withTx, TxAbort, supportsTransactions } = require("../utils/tx");
+const { withTx, TxAbort } = require("../utils/tx");
 
 /* =========================================================
    SOCKET HELPER
@@ -338,9 +338,7 @@ const adjustStock = async (req, res) => {
     // Conditional $inc / versioned set + history in one withTx (optimizeplan §4.1)
     let history;
     let previousQuantity;
-    let newQuantity;
-    const transactional = await supportsTransactions();
-    let stockTouched = null;
+    let newQuantity;    let stockTouched = null;
     try {
       ({ result: { history, previousQuantity, newQuantity } } = await withTx(async () => {
         stockTouched = null;
@@ -404,12 +402,6 @@ const adjustStock = async (req, res) => {
         return { history: row, previousQuantity: prev, newQuantity: next };
       }));
     } catch (txError) {
-      if (!transactional && stockTouched) {
-        await Variant.updateOne(
-          { _id: stockTouched.variant_id },
-          { $set: { quantity: stockTouched.from } },
-        ).catch(() => {});
-      }
       if (txError instanceof TxAbort) return res.status(txError.status).json(txError.body);
       throw txError;
     }

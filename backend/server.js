@@ -158,9 +158,7 @@ process.on("uncaughtException", (error) => {
 // ==========================================
 const startServer = async () => {
   try {
-    await connectDB();
-    // Replica set? (checkout transactions) — nahi to bari warning (utils/tx.js)
-    await require("./utils/tx").supportsTransactions();
+    await connectDB(); // fails fast unless MongoDB is a replica set (§3.1)
     await ChatConversation.ensureChatIndexes();
     createUploadDirectories();
     await seedDefaultData();

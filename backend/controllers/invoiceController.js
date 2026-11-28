@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const Invoice = require("../models/Invoice");
 const { nextSeq, peekSeq, ensureSeeded, formatNumber, maxNumericSuffix } = require("../utils/counter"); // atomic per-store numbers
-const { withTx, TxAbort, supportsTransactions } = require("../utils/tx"); // stock + invoice ek transaction
+const { withTx, TxAbort } = require("../utils/tx"); // stock + invoice ek transaction
 const Customer = require("../models/Customer");
 const Variant = require("../models/Variant");
 const { calculateReturnLine, capReturnLines, calculateReturnSettlement, getOriginalInvoiceTotal } = require("../utils/invoiceReturnMath");
@@ -284,7 +284,6 @@ exports.getInvoice = async (req, res) => {
 
 exports.createInvoice = async (req, res) => {
   const deductedStock = [];
-  let transactional = false;
   try {
     const data = buildInvoice(req.body);
     if (!data.customer_id) return res.status(400).json({ success: false, message: "Select a valid customer" });
@@ -301,9 +300,7 @@ exports.createInvoice = async (req, res) => {
       quantitiesByVariant.set(key, { product_id: item.product_id, quantity: (existing?.quantity || 0) + item.quantity, name: item.name });
     }
 
-    // Counter seed transaction se pehle (andar seed race tx abort kar deti)
     await ensureSeeded("invoice", { seed: invoiceSeed });
-    transactional = await supportsTransactions();
     const { result: invoice } = await withTx(async () => {
       deductedStock.length = 0; // driver retry par reset
       for (const [variantId, entry] of quantitiesByVariant) {
@@ -340,10 +337,6 @@ exports.createInvoice = async (req, res) => {
     } catch (socketError) {}
     res.status(201).json({ success: true, data: invoice });
   } catch (error) {
-    // Replica set: transaction ne sab rollback. Standalone: stock wapas.
-    if (!transactional) {
-      await Promise.all(deductedStock.map(({ variant_id, quantity }) => Variant.updateOne({ _id: variant_id }, { $inc: { quantity } }).catch(() => null)));
-    }
     if (error instanceof TxAbort) return res.status(error.status).json(error.body);
     res.status(400).json({ success: false, message: error.message });
   }
@@ -351,15 +344,6 @@ exports.createInvoice = async (req, res) => {
 
 exports.updateInvoice = async (req, res) => {
   const stockChanges = [];
-  let transactional = false;
-  const rollbackStock = async () => {
-    let failed = false;
-    for (const change of [...stockChanges].reverse()) {
-      await Variant.updateOne({ _id: change.variant_id }, { $inc: { quantity: -change.stockChange } }).catch(() => { failed = true; });
-    }
-    stockChanges.length = 0;
-    return failed;
-  };
   try {
     const current = await Invoice.findOne({ _id: req.params.id, is_deleted: false });
     if (!current) return res.status(404).json({ success: false, message: "Invoice not found" });
@@ -398,9 +382,6 @@ exports.updateInvoice = async (req, res) => {
     // A save with no meaningful differences should not create an empty timeline entry.
     if (changes.length) update.$push = { activity: invoiceActivity(req, "updated", changes) };
 
-    // 🔒 Stock delta + invoice update ek transaction. Concurrent edit → 409, stock
-    // replica set par khud rollback; standalone par neeche compensation.
-    transactional = await supportsTransactions();
     const { result: updatedInvoice } = await withTx(async () => {
       stockChanges.length = 0;
       for (const adjustment of adjustments) {
@@ -446,7 +427,6 @@ exports.updateInvoice = async (req, res) => {
     } catch (socketError) {}
     return res.json({ success: true, data: updatedInvoice });
   } catch (error) {
-    if (!transactional) await rollbackStock();
     if (error instanceof TxAbort) return res.status(error.status).json(error.body);
     return res.status(400).json({ success: false, message: error.message });
   }
@@ -508,19 +488,6 @@ exports.recordPayment = async (req, res) => {
 exports.recordReturn = async (req, res) => {
   const stockChanges = [];
   let stockHistoryExplanation = "";
-  let transactional = false;
-  const rollbackRestock = async () => {
-    let failed = false;
-    if (stockHistoryExplanation) {
-      await StockHistory.deleteMany({ explanation: stockHistoryExplanation }).catch(() => { failed = true; });
-    }
-    for (const change of [...stockChanges].reverse()) {
-      await Variant.updateOne({ _id: change.variant_id }, { $inc: { quantity: -change.quantity } })
-        .catch(() => { failed = true; });
-    }
-    stockChanges.length = 0;
-    return failed;
-  };
   try {
     const invoice = await Invoice.findOne({ _id: req.params.id, is_deleted: false });
     if (!invoice) return res.status(404).json({ success: false, message: "Invoice not found" });
@@ -646,9 +613,6 @@ exports.recordReturn = async (req, res) => {
       };
     }
 
-    // 🔒 Restock + history + invoice return claim ek transaction. Concurrent
-    // return same __v/amount_paid/total par fail → 409 (double restock nahi).
-    transactional = await supportsTransactions();
     const { result: updatedInvoice } = await withTx(async () => {
       stockChanges.length = 0;
       const stockHistoryRows = [];
@@ -695,7 +659,6 @@ exports.recordReturn = async (req, res) => {
     } catch (socketError) {}
     return res.json({ success: true, data: updatedInvoice });
   } catch (error) {
-    if (!transactional) await rollbackRestock();
     if (error instanceof TxAbort) return res.status(error.status).json(error.body);
     return res.status(400).json({ success: false, message: error.message });
   }

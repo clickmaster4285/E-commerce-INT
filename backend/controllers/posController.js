@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const { withTx, supportsTransactions } = require("../utils/tx"); // POS sale / return transactions
+const { withTx } = require("../utils/tx"); // POS sale / return transactions
 const { nextSeq, peekSeq, formatNumber, maxNumericSuffix } = require("../utils/counter"); // atomic per-store numbers
 const Product = require("../models/Product");
 const Variant = require("../models/Variant");
@@ -358,12 +358,6 @@ const getPosReturns = async (req, res) => {
 };
 
 const returnPosSaleItems = async (req, res) => {
-  let transactional = false;
-  const stockChanges = [];
-  let insertedHistory = false;
-  let saleId = null;
-  let returnRecordId = null;
-  let historyExplanation = "";
   try {
     const { items = [], note = "" } = req.body || {};
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ success: false, message: "Invalid POS sale id" });
@@ -371,64 +365,76 @@ const returnPosSaleItems = async (req, res) => {
     const reason = String(note || "").trim();
     if (!reason) return res.status(400).json({ success: false, message: "A return reason is required" });
     if (reason.length > 300) return res.status(400).json({ success: false, message: "Return reason must be 300 characters or fewer" });
-    // 🔒 Ek transaction: return check + stock + history + sale save. Do concurrent
-    // returns pehle dono check pass kar ke zyada wapas kar sakte the; ab doosri
-    // WriteConflict par retry hoti hai aur taaza returns dekh kar ruk jati hai.
-    transactional = await supportsTransactions();
+
     const { result } = await withTx(async () => {
-    stockChanges.length = 0; insertedHistory = false; // retry par reset
-    const sale = await PosSale.findById(req.params.id);
-    if (!sale || sale.status !== "completed") throw Object.assign(new Error("Completed sale not found"), { status: 404 });
-    saleId = sale._id;
-    const returnedSoFar = new Map();
-    for (const ret of sale.returns || []) for (const line of ret.items || []) {
-      const id = String(line.variant_id);
-      returnedSoFar.set(id, (returnedSoFar.get(id) || 0) + Number(line.quantity || 0));
-    }
-    const returnLines = [];
-    let refundTotal = 0;
-    const additionalTaxRate = Math.min(100, Math.max(0, Number(sale.additional_tax_rate) || 0));
-    const taxInclusiveItemsTotal = sale.items.reduce((sum, line) => sum + (Number(line.line_total) || 0) * (1 + ((Number(line.tax_rate) || 0) + additionalTaxRate) / 100), 0);
-    const itemDiscounts = sale.items.reduce((sum, line) => sum + (Number(line.discount_amount) || 0), 0);
-    const saleLevelDiscount = Math.max(0, (Number(sale.discount_amount) || 0) - itemDiscounts);
-    for (const requested of items) {
-      const variantId = String(requested.variant_id || "");
-      const quantity = Number(requested.quantity);
-      if (!mongoose.isValidObjectId(variantId) || !Number.isInteger(quantity) || quantity < 1) throw new Error("Invalid return item or quantity");
-      const original = sale.items.find((line) => String(line.variant_id) === variantId);
-      if (!original) throw new Error("An item does not belong to this sale");
-      const alreadyReturned = returnedSoFar.get(variantId) || 0;
-      const requestedTotal = returnLines.filter((line) => String(line.variant_id) === variantId).reduce((sum, line) => sum + line.quantity, 0) + quantity;
-      if (alreadyReturned + requestedTotal > original.quantity) throw new Error(`Only ${Math.max(0, original.quantity - alreadyReturned)} more ${original.product_name} item(s) can be returned`);
-      const gross = Number(original.line_total) * (1 + ((Number(original.tax_rate) || 0) + additionalTaxRate) / 100);
-      const allocatedSaleDiscount = taxInclusiveItemsTotal > 0 ? saleLevelDiscount * (gross / taxInclusiveItemsTotal) : 0;
-      const refund = Math.round(Math.max(0, gross - allocatedSaleDiscount) / original.quantity * quantity);
-      refundTotal += refund;
-      returnLines.push({ variant_id: original.variant_id, product_name: original.product_name, sku: original.sku, variant_title: original.variant_title, quantity, refund_amount: refund });
-    }
-    const historyRows = [];
-    returnRecordId = new mongoose.Types.ObjectId();
-    historyExplanation = `Return ${returnRecordId} for ${sale.sale_number}: ${reason}`;
-    for (const line of returnLines) {
-      const variant = await Variant.findOneAndUpdate({ _id: line.variant_id }, { $inc: { quantity: line.quantity } }, { returnDocument: "after" });
-      if (!variant) throw new Error(`Could not restore stock for ${line.product_name}`);
-      stockChanges.push({ variant_id: line.variant_id, quantity: line.quantity });
-      historyRows.push({ variant_id: line.variant_id, product_id: sale.items.find((item) => String(item.variant_id) === String(line.variant_id))?.product_id, product_name: line.product_name, sku: line.sku, variant_title: line.variant_title, previous_quantity: variant.quantity - line.quantity, new_quantity: variant.quantity, change_quantity: line.quantity, adjustment_type: "add", reason: "POS sale return", explanation: historyExplanation, performed_by: req.user?._id || null, performed_by_name: req.user?.name || "Administrator" });
-    }
-    await StockHistory.insertMany(historyRows);
-    insertedHistory = true;
-    sale.returns.push({ _id: returnRecordId, returned_by: req.user?._id || null, returned_by_name: req.user?.name || "Administrator", reason, refund_method: "cash", refund_total: refundTotal, items: returnLines });
-    await sale.save();
-    return { sale, refundTotal };
+      const sale = await PosSale.findById(req.params.id);
+      if (!sale || sale.status !== "completed") throw Object.assign(new Error("Completed sale not found"), { status: 404 });
+      const returnedSoFar = new Map();
+      for (const ret of sale.returns || []) {
+        for (const line of ret.items || []) {
+          const id = String(line.variant_id);
+          returnedSoFar.set(id, (returnedSoFar.get(id) || 0) + Number(line.quantity || 0));
+        }
+      }
+      const returnLines = [];
+      let refundTotal = 0;
+      const additionalTaxRate = Math.min(100, Math.max(0, Number(sale.additional_tax_rate) || 0));
+      const taxInclusiveItemsTotal = sale.items.reduce((sum, line) => sum + (Number(line.line_total) || 0) * (1 + ((Number(line.tax_rate) || 0) + additionalTaxRate) / 100), 0);
+      const itemDiscounts = sale.items.reduce((sum, line) => sum + (Number(line.discount_amount) || 0), 0);
+      const saleLevelDiscount = Math.max(0, (Number(sale.discount_amount) || 0) - itemDiscounts);
+      for (const requested of items) {
+        const variantId = String(requested.variant_id || "");
+        const quantity = Number(requested.quantity);
+        if (!mongoose.isValidObjectId(variantId) || !Number.isInteger(quantity) || quantity < 1) throw new Error("Invalid return item or quantity");
+        const original = sale.items.find((line) => String(line.variant_id) === variantId);
+        if (!original) throw new Error("An item does not belong to this sale");
+        const alreadyReturned = returnedSoFar.get(variantId) || 0;
+        const requestedTotal = returnLines.filter((line) => String(line.variant_id) === variantId).reduce((sum, line) => sum + line.quantity, 0) + quantity;
+        if (alreadyReturned + requestedTotal > original.quantity) throw new Error(`Only ${Math.max(0, original.quantity - alreadyReturned)} more ${original.product_name} item(s) can be returned`);
+        const gross = Number(original.line_total) * (1 + ((Number(original.tax_rate) || 0) + additionalTaxRate) / 100);
+        const allocatedSaleDiscount = taxInclusiveItemsTotal > 0 ? saleLevelDiscount * (gross / taxInclusiveItemsTotal) : 0;
+        const refund = Math.round(Math.max(0, gross - allocatedSaleDiscount) / original.quantity * quantity);
+        refundTotal += refund;
+        returnLines.push({ variant_id: original.variant_id, product_name: original.product_name, sku: original.sku, variant_title: original.variant_title, quantity, refund_amount: refund });
+      }
+      const returnRecordId = new mongoose.Types.ObjectId();
+      const historyExplanation = `Return ${returnRecordId} for ${sale.sale_number}: ${reason}`;
+      const historyRows = [];
+      for (const line of returnLines) {
+        const variant = await Variant.findOneAndUpdate({ _id: line.variant_id }, { $inc: { quantity: line.quantity } }, { returnDocument: "after" });
+        if (!variant) throw new Error(`Could not restore stock for ${line.product_name}`);
+        historyRows.push({
+          variant_id: line.variant_id,
+          product_id: sale.items.find((item) => String(item.variant_id) === String(line.variant_id))?.product_id,
+          product_name: line.product_name,
+          sku: line.sku,
+          variant_title: line.variant_title,
+          previous_quantity: variant.quantity - line.quantity,
+          new_quantity: variant.quantity,
+          change_quantity: line.quantity,
+          adjustment_type: "add",
+          reason: "POS sale return",
+          explanation: historyExplanation,
+          performed_by: req.user?._id || null,
+          performed_by_name: req.user?.name || "Administrator",
+        });
+      }
+      await StockHistory.insertMany(historyRows);
+      sale.returns.push({
+        _id: returnRecordId,
+        returned_by: req.user?._id || null,
+        returned_by_name: req.user?.name || "Administrator",
+        reason,
+        refund_method: "cash",
+        refund_total: refundTotal,
+        items: returnLines,
+      });
+      await sale.save();
+      return { sale, refundTotal };
     });
     return res.status(201).json({ success: true, data: { sale: result.sale, refund_total: result.refundTotal } });
   } catch (error) {
-    // Transaction me sab khud rollback; sirf standalone MongoDB par manual compensation
-    if (transactional) return res.status(error.status || 400).json({ success: false, message: error.message || "Unable to return POS sale items" });
-    if (insertedHistory) await StockHistory.deleteMany({ reason: "POS sale return", explanation: historyExplanation }).catch(() => {});
-    if (returnRecordId && saleId) await PosSale.updateOne({ _id: saleId }, { $pull: { returns: { _id: returnRecordId } } }).catch(() => {});
-    for (const change of stockChanges.reverse()) await Variant.updateOne({ _id: change.variant_id }, { $inc: { quantity: -change.quantity } }).catch(() => {});
-    return res.status(400).json({ success: false, message: error.message || "Unable to return POS sale items" });
+    return res.status(error.status || 400).json({ success: false, message: error.message || "Unable to return POS sale items" });
   }
 };
 
@@ -649,19 +655,13 @@ const savePosSale = async (req, res, existingSale = null) => {
       notes: String(notes || "").trim(),
     };
 
-    // 🔒 Replica set par ek transaction (stock + sale + history ek saath). Standalone
-    // MongoDB par neeche wala manual compensation hi chalta hai (utils/tx.js).
-    const transactional = await supportsTransactions();
-    const stockChanges = [];
-    const historyRows = [];
+    // 🔒 Replica set transaction (stock + sale + history)
     const saleId = existingSale?._id || new mongoose.Types.ObjectId();
-    let saleWriteAttempted = false;
     const historyReason = originalSale ? "POS sale edit" : "POS sale";
     const historyExplanation = originalSale ? `POS sale edit ${saleNumber}` : `POS sale ${saleNumber}`;
 
-    try {
-      const { result: savedSaleResult } = await withTx(async () => {
-      stockChanges.length = 0; historyRows.length = 0; saleWriteAttempted = false; // retry par reset
+    const { result: savedSaleResult } = await withTx(async () => {
+      const historyRows = [];
       const affectedVariantIds = new Set([...originalQuantities.keys(), ...requestedQuantities.keys()]);
       for (const variantId of affectedVariantIds) {
         const previousSold = originalQuantities.get(variantId) || 0;
@@ -684,7 +684,6 @@ const savePosSale = async (req, res, existingSale = null) => {
           );
         if (!updated) throw new Error(`Stock changed while saving ${line?.product_name || "this sale"}. Please retry.`);
 
-        stockChanges.push({ variant_id: variantId, quantity: stockChange });
         historyRows.push({
           variant_id: variantId,
           product_id: line?.product_id,
@@ -702,8 +701,6 @@ const savePosSale = async (req, res, existingSale = null) => {
         });
       }
 
-      saleWriteAttempted = true;
-      // Edit: sirf tab jab sale hamare padhne ke baad kisi aur ne nahi badli (optimistic lock)
       const savedSale = existingSale
         ? await PosSale.findOneAndUpdate(
           { _id: saleId, ...(originalSale?.updated_at ? { updated_at: originalSale.updated_at } : {}) },
@@ -714,43 +711,8 @@ const savePosSale = async (req, res, existingSale = null) => {
       if (!savedSale) throw new Error(existingSale ? "This sale was changed by someone else. Please reload and try again." : "Sale could not be saved.");
       if (historyRows.length) await StockHistory.insertMany(historyRows);
       return savedSale;
-      });
-      return res.status(existingSale ? 200 : 201).json({ success: true, data: savedSaleResult });
-    } catch (error) {
-      if (transactional) throw error; // transaction ne sab rollback kar diya
-      const rollbackErrors = [];
-      if (saleWriteAttempted) {
-        try {
-          if (originalSale) {
-            const restore = { ...originalSale };
-            delete restore._id;
-            delete restore.created_at;
-            delete restore.updated_at;
-            await PosSale.findByIdAndUpdate(saleId, { $set: restore }, { runValidators: false });
-          } else {
-            await PosSale.deleteOne({ _id: saleId });
-          }
-        } catch (rollbackError) { rollbackErrors.push(rollbackError); }
-      }
-      if (historyRows.length) {
-        try {
-          await StockHistory.deleteMany({ reason: historyReason, explanation: historyExplanation });
-        } catch (rollbackError) {
-          rollbackErrors.push(rollbackError);
-        }
-      }
-      for (const change of stockChanges.reverse()) {
-        try {
-          await Variant.updateOne({ _id: change.variant_id }, { $inc: { quantity: -change.quantity } });
-        } catch (rollbackError) {
-          rollbackErrors.push(rollbackError);
-        }
-      }
-      if (rollbackErrors.length) {
-        return res.status(500).json({ success: false, message: `${error.message || "Sale failed"}. Some rollback steps also failed; check stock history for POS ${saleNumber}.` });
-      }
-      throw error;
-    }
+    });
+    return res.status(existingSale ? 200 : 201).json({ success: true, data: savedSaleResult });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message || "Unable to save POS sale" });
   }

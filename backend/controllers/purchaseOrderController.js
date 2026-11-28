@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const { nextSeq, peekSeq, formatNumber, maxNumericSuffix } = require("../utils/counter"); // atomic per-store numbers
-const { withTx, TxAbort, supportsTransactions } = require("../utils/tx");
+const { withTx, TxAbort } = require("../utils/tx");
 const PurchaseOrder = require("../models/PurchaseOrder");
 const PurchasePayment = require("../models/PurchasePayment");
 const Vendor = require("../models/Vendor");
@@ -433,14 +433,12 @@ const deliverPO = async (req, res) => {
     if (notFull) return res.status(400).json({ success: false, message: "Deliver the full ordered quantity for all lines" });
 
     let touched = [];
-    let stockApplied = [];
-    const transactional = await supportsTransactions();
-    let deliveredPo;
+    let stockApplied = [];    let deliveredPo;
     try {
       ({ result: deliveredPo } = await withTx(async () => {
         touched = [];
         stockApplied = [];
-        // Conditional status claim — second concurrent deliver loses on standalone too
+        // Conditional status claim — second concurrent deliver loses (WriteConflict / 409)
         const claimed = await PurchaseOrder.findOneAndUpdate(
           { _id: po._id, status: "confirmed" },
           { $set: { status: "delivered", updatedby: req.user?._id || null } },
@@ -512,15 +510,6 @@ const deliverPO = async (req, res) => {
         return claimed;
       }));
     } catch (txError) {
-      if (!transactional && stockApplied.length) {
-        for (const s of stockApplied) {
-          await Variant.updateOne({ _id: s.variant_id }, { $inc: { quantity: -s.qty } }).catch(() => {});
-        }
-        await PurchaseOrder.updateOne(
-          { _id: po._id, status: "delivered" },
-          { $set: { status: "confirmed" } },
-        ).catch(() => {});
-      }
       if (txError instanceof TxAbort) return res.status(txError.status).json(txError.body);
       throw txError;
     }
@@ -563,9 +552,7 @@ const recordPOPayment = async (req, res) => {
       ...(oldPaidAmount !== newPaid ? [{ field: "Paid amount", before: String(oldPaidAmount), after: String(newPaid) }] : []),
       ...(oldDueAmount !== newDue ? [{ field: "Due amount", before: String(oldDueAmount), after: String(newDue) }] : []),
       ...(oldStatus !== newStatus ? [{ field: "Status", before: oldStatus, after: newStatus }] : []),
-    ]);
-    const transactional = await supportsTransactions();
-    let updatedPO = null;
+    ]);    let updatedPO = null;
     let pay = null;
     try {
       ({ result: { updatedPO, pay } } = await withTx(async () => {
@@ -585,13 +572,6 @@ const recordPOPayment = async (req, res) => {
         return { updatedPO: nextPO, pay: created };
       }));
     } catch (txError) {
-      // Standalone MongoDB: PO update ho gaya lekin payment create fail → PO wapas
-      if (!transactional && !pay && !(txError instanceof TxAbort)) {
-        await PurchaseOrder.updateOne(
-          { _id: po._id, paid_amount: newPaid },
-          { $set: { paid_amount: oldPaidAmount, due_amount: oldDueAmount, status: oldStatus, payment_status: po.payment_status } },
-        ).catch(() => {});
-      }
       if (txError instanceof TxAbort) return res.status(txError.status).json(txError.body);
       throw txError;
     }
