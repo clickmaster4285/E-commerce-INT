@@ -28,6 +28,10 @@ const { isSameValue, isSameList } = require("../utils/activityHelper");
 const { queueTranslationSync } = require("../utils/translationService");
 const { refreshAsync: refreshProductSummary } = require("../services/productSummary");
 const { adjustVariantQuantityToTarget } = require("../utils/variantQuantityAdjust");
+const {
+  buildProductFilter,
+  parseShopParams,
+} = require("../services/productQueryService");
 
 // ======================================================
 // JSON PARSER
@@ -179,139 +183,8 @@ const validateSpecifications = async (categoryId, specifications, tenantId) => {
 };
 
 // ======================================================
-// SHARED FILTER BUILDER
-// ✅ Products list aur Products summary stats — dono same filter use karte hain
-//    (search / category / brand / status) taake dono ka data consistent rahe.
-// ======================================================
-const collectIds = (value) => {
-  const arr = Array.isArray(value) ? value : String(value || "").split(",");
-  const out = [];
-  for (const raw of arr) {
-    const id = String(raw || "").trim();
-    if (id && id !== "all" && mongoose.Types.ObjectId.isValid(id) && !out.includes(id)) {
-      out.push(id);
-    }
-  }
-  return out;
-};
-
-// ✅ Category subtree expand (homeCatalog.categorySubtreeIds parity) —
-// parent select ho to uske saare children bhi match hote hain
-// ⚠️ Sirf ACTIVE categories ka tree expand karo — disabled category ke
-// products storefront me nahi dikhne chahiye (category public endpoint
-// aur category-tiles bhi is_active: true filter karte hain).
-const expandCategorySubtrees = async (rootIds) => {
-  if (!rootIds.length) return [];
-
-  // §4.4 fast path: ancestors se ek indexed query. Agar koi legacy child category (ancestors khali,
-  // backfillCategoryAncestors.js abhi nahi chali) maujood ho to purane tree-walk par wapas.
-  const legacyChild = await Category.exists({
-    is_deleted: false,
-    parent_category_id: { $ne: null },
-    $or: [{ ancestors: { $exists: false } }, { ancestors: { $size: 0 } }],
-  });
-  if (!legacyChild) {
-    const roots = new Set(rootIds.map(String));
-    const rows = await Category.find({
-      is_deleted: false,
-      is_active: true,
-      ancestors: { $in: [...roots].filter((r) => mongoose.isValidObjectId(r)).map((r) => new mongoose.Types.ObjectId(r)) },
-    }).select("_id ancestors").lean();
-    const activeSet = new Set([...roots, ...rows.map((r) => String(r._id))]);
-    const out = new Set(roots);
-    for (const row of rows) {
-      const anc = (row.ancestors || []).map(String);
-      let lastRoot = -1;
-      anc.forEach((a, i) => { if (roots.has(a)) lastRoot = i; });
-      // root ke neeche ki saari intermediate categories active honi chahiye (purane walk jaisa)
-      if (anc.slice(lastRoot + 1).every((a) => activeSet.has(a))) out.add(String(row._id));
-    }
-    return [...out];
-  }
-
-  const cats = await Category.find({ is_deleted: false, is_active: true }).select("parent_category_id").lean();
-  const childrenOf = new Map();
-  cats.forEach((c) => {
-    const pid = String(c.parent_category_id?._id || c.parent_category_id || "");
-    if (!pid) return;
-    if (!childrenOf.has(pid)) childrenOf.set(pid, []);
-    childrenOf.get(pid).push(String(c._id));
-  });
-  const set = new Set(rootIds.map(String));
-  let grew = true;
-  while (grew) {
-    grew = false;
-    set.forEach((sid) => {
-      (childrenOf.get(sid) || []).forEach((child) => {
-        if (!set.has(child)) {
-          set.add(child);
-          grew = true;
-        }
-      });
-    });
-  }
-  return [...set];
-};
-
-const buildProductFilter = async (query = {}) => {
-  const brandIds = collectIds(query.brand_ids ?? query.brand_id);
-  const categoryIds = collectIds(query.category_ids ?? query.category_id);
-  const statusFilter = String(query.status || "").trim();
-  const search = String(query.search || query.q || "").trim();
-  // ✅ Featured Products page — sirf "?featured=true" bheje tab filter lagta hai
-  //    (legacy callers filter nahi bhejte → unka behavior bilkul same rehta hai).
-  const featuredFilter = String(query.featured || "").trim().toLowerCase();
-
-  // ---- Filter build ----
-  // ✅ Optional filters (category/status) — legacy mode ko break nahi karte,
-  //     sirf tab apply hote hain jab explicitly bheja jaye.
-  const filter = { is_deleted: { $ne: true } };
-  if (brandIds.length === 1) filter.brand_id = brandIds[0];
-  else if (brandIds.length > 1) filter.brand_id = { $in: brandIds };
-  // ⚠️ Filter by category + ensure category is active (is_active: true)
-    // This prevents products in disabled categories from appearing in storefront
-    if (categoryIds.length) {
-      const expanded = await expandCategorySubtrees(categoryIds);
-      filter.category_id = { $in: expanded.length ? expanded : categoryIds };
-    }
-  if (statusFilter && statusFilter !== "all") filter.status = statusFilter;
-  if (featuredFilter === "true" || featuredFilter === "1") filter.is_featured = true;
-  else if (featuredFilter === "false" || featuredFilter === "0") filter.is_featured = false;
-
-  if (search) {
-    const escaped = escapeRegex(search);
-    // §4.4 — prefix on denormalized search_text first; legacy $or for unbackfilled rows
-    const prefix = { $regex: `^${escaped}`, $options: "i" };
-    const rx = { $regex: escaped, $options: "i" };
-    const [brandDocs, catDocs, variantDocs] = await Promise.all([
-      Brand
-        ? Brand.find({ name: rx, is_deleted: { $ne: true }, is_active: true }).select("_id").lean().catch(() => [])
-        : Promise.resolve([]),
-      Category.find({ name: rx, is_deleted: { $ne: true }, is_active: true }).select("_id").lean().catch(() => []),
-      Variant.find({ sku: rx, is_deleted: { $ne: true } }).select("product_id").lean().catch(() => []),
-    ]);
-    const legacyOr = [
-      { name: rx },
-      { brand_id: { $in: brandDocs.map((b) => b._id) } },
-      { category_id: { $in: catDocs.map((c) => c._id) } },
-      { _id: { $in: variantDocs.map((v) => v.product_id) } },
-    ];
-    filter.$or = [
-      { search_text: prefix },
-      {
-        $and: [
-          { $or: [{ search_text: "" }, { search_text: { $exists: false } }, { search_text: null }] },
-          { $or: legacyOr },
-        ],
-      },
-    ];
-  }
-
-  return { filter, search };
-};
-
-// ======================================================
 // 🛍️ SHOP FACETS (storefront server-side filtering)
+// Filter/subtree/shop-params → services/productQueryService (§4.4)
 // Client semantics (homeCatalog.js) ka exact port:
 //  - price: FIRST variant (created_at:1) ki selling_price; variant na ho to 0
 //  - stock: variant quantities ka sum (na ho to 0); out<1, low<5, else in
@@ -321,57 +194,6 @@ const buildProductFilter = async (query = {}) => {
 // ======================================================
 const SHOP_STOCK_STATES = ["in", "low", "out"];
 const LOW_STOCK_THRESHOLD = 5;
-
-const toIdList = (value, cap = 100) => {
-  const arr = Array.isArray(value) ? value : String(value || "").split(",");
-  const out = [];
-  for (const raw of arr) {
-    const id = String(raw || "").trim();
-    if (id && mongoose.Types.ObjectId.isValid(id) && !out.includes(id)) out.push(id);
-    if (out.length >= cap) break;
-  }
-  return out;
-};
-
-const numOrNull = (value) => {
-  if (value === undefined || value === null || value === "") return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-};
-
-// ✅ Sanitized shop params — invalid/negative/NaN → safe default/ignore
-const parseShopParams = (query = {}) => {
-  let minPrice = numOrNull(query.minPrice);
-  let maxPrice = numOrNull(query.maxPrice);
-  if (minPrice !== null && minPrice < 0) minPrice = 0;
-  if (maxPrice !== null && maxPrice < 0) maxPrice = 0;
-  if (minPrice !== null && maxPrice !== null && minPrice > maxPrice) {
-    [minPrice, maxPrice] = [maxPrice, minPrice];
-  }
-  const stockStates = toIdList(query.stockStates ?? query.stock, 10).filter((s) =>
-    SHOP_STOCK_STATES.includes(s),
-  );
-  // ✅ discount bands (?discount=10&discount=20) + single (?discountBand=20) + threshold (?minDiscount=)
-  const bandNums = toIdList(query.discount ?? query.discounts ?? [], 10)
-    .map(Number)
-    .filter((n) => Number.isFinite(n) && n > 0);
-  const singleBand = numOrNull(query.discountBand);
-  if (singleBand !== null && singleBand > 0) bandNums.push(singleBand);
-  const threshold = numOrNull(query.minDiscount);
-  if (threshold !== null && threshold > 0) bandNums.push(threshold);
-  const minDiscountBand = bandNums.length ? Math.min(...bandNums) : null;
-  const dealIds = toIdList(query.dealIds ?? query.deal, 50).filter((id) =>
-    mongoose.Types.ObjectId.isValid(id),
-  );
-  const ids = toIdList(query.ids, 50);
-  const hasShopFilters =
-    minPrice !== null ||
-    maxPrice !== null ||
-    stockStates.length > 0 ||
-    minDiscountBand !== null ||
-    dealIds.length > 0;
-  return { minPrice, maxPrice, stockStates, minDiscountBand, dealIds, ids, hasShopFilters };
-};
 
 // ✅ Ek aggregation me first-variant price + stock sum (Variant index se)
 const variantStatsMap = async (productIds) => {

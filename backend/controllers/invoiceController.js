@@ -16,6 +16,7 @@ const { normalizeMethod: normalizePayMethod } = require("../config/paymentMethod
 
 const { roundMoney: round } = require("../utils/roundMoney");
 const { escapeRegex } = require("../utils/escapeRegex");
+const { keysetFilter, encodeCursor } = require("../utils/keysetPaginate");
 const actorName = (req) => String(req.user?.name || req.user?.username || req.user?.email || "Administrator").trim();
 const auditValue = (value) => String(value ?? "")
   .replace(/<br\s*\/?>/gi, "\n")
@@ -248,8 +249,16 @@ exports.listInvoices = async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     // ✅ 4 countDocuments ki jagah ek $facet (§4.3)
+    // §4.4 keyset: ?cursor= on created_at desc (page/skip remains)
+    const cursorFilter = keysetFilter(req.query.cursor, "created_at");
+    const findFilter = cursorFilter ? { $and: [filter, cursorFilter] } : filter;
     const [invoices, statCounts] = await Promise.all([
-      Invoice.find(filter).select(listFields).sort({ created_at: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      Invoice.find(findFilter)
+        .select(listFields)
+        .sort({ created_at: -1, _id: -1 })
+        .skip(cursorFilter ? 0 : (page - 1) * limit)
+        .limit(limit)
+        .lean(),
       facetCounts(Invoice, {
         total: {},
         paid: { status: "Paid" },
@@ -267,6 +276,7 @@ exports.listInvoices = async (req, res) => {
     return res.json({
       success: true,
       data: localizedInvoices,
+      nextCursor: invoices.length === limit ? encodeCursor(invoices[invoices.length - 1], "created_at") : null,
       stats: { total, paid, unpaid, overdue },
       pagination: { total: filteredTotal, page, limit, pages, hasNext: page < pages, hasPrev: page > 1 },
     });

@@ -446,78 +446,23 @@ const createUser = async (req, res) => {
 // 🛒 CUSTOMER LOGIN
 // ==========================================
 
+const { authenticateCustomer, issueSession, toPublicUser } = require("../services/auth");
+
 const loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password)
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide email and password" });
-    const user = await User.findOne({ email });
-    if (!user)
-      return res
-        .status(401)
-        .json({ success: false, message: "User not found" });
-    if (user.role !== "user")
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "This login is only for customers. Please use admin panel.",
-        });
-    if (user.status === "inactive" || user.status === "blocked" || user.is_deleted) {
-      // If it's a pending seller, tell them the application is under review
-      try {
-        const app = await SellerApplication.findOne({ email: user.email }).select("status").lean();
-        if (user.status === "blocked" && app && String(app.status).toLowerCase() === "pending") {
-          return res.status(403).json({
-            success: false,
-            code: "SELLER_PENDING",
-            message: "Your seller application is under review. You will be notified by email once it is approved.",
-          });
-        }
-      } catch (lookupError) {
-        console.error("[login] seller application lookup failed:", lookupError.message);
-      }
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Your account is inactive. Please contact administrator.",
-        });
-    }
-    const isValid = await bcrypt.compare(password, user.password);
-    if (!isValid)
-      return res
-        .status(401)
-        .json({ success: false, message: "Password incorrect" });
-
-    // ✅ EMAIL VERIFICATION — verified nahi hai to login nahi hoga
-    // (purane users mein field undefined hota hai, unhe verified maana jata hai)
-    if (user.emailVerified === false)
-      return res.status(403).json({
-        success: false,
-        needsVerification: true,
-        email: user.email,
-        message:
-          "Your email is not verified. Please verify it with the code we sent to your email.",
-      });
-
-    const io = req.io || getIO();
-
-    await tokens.issueSession(req, res, "user", user);
+    // customerAuth routes are store-scoped; keep storeRequired so platform host cannot login customers
+    const auth = await authenticateCustomer({
+      email: req.body?.email,
+      password: req.body?.password,
+      store: req.store,
+      storeRequired: true,
+    });
+    if (!auth.ok) return res.status(auth.status).json(auth.body);
+    await issueSession(req, res, "user", auth.user);
     res.json({
       success: true,
       message: "Login successful",
-      user: {
-        id: user._id,
-        name: user.name,
-        username: user.username,
-        phone: user.phone,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar || null,
-      },
+      user: toPublicUser(auth.user),
     });
   } catch (error) {
     log.error("loginUser error:", error);

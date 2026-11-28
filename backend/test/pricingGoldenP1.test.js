@@ -68,7 +68,23 @@ test("golden: priceCheckout — regular discount line (server price + savings)",
 });
 
 test("services/pricing/index exports saari rules ek jagah", () => {
-  for (const key of ["money", "dealRules", "bundleRules", "discountRules", "priceCheckout"]) {
+  for (const key of ["money", "dealRules", "bundleRules", "discountRules", "priceCheckout", "pricePosLine"]) {
     assert.ok(pricing[key], `missing ${key}`);
   }
+});
+
+test("golden: pricePosLine % + flat + tax", () => {
+  const line = pricing.pricePosLine({
+    unitPrice: 100,
+    quantity: 2,
+    discountRate: 10,
+    flatDiscountPerUnit: 5,
+    taxRate: 10,
+  });
+  // gross 200; %disc 20; flat 10; line 170; tax 17
+  assert.equal(line.grossLineTotal, 200);
+  assert.equal(line.itemDiscount, 30);
+  assert.equal(line.lineTotal, 170);
+  assert.equal(line.itemTax, 17);
+  assert.equal(line.flat_discount, 5);
 });

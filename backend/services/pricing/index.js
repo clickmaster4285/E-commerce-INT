@@ -18,5 +18,6 @@ const dealRules = require("./dealRules");
 const bundleRules = require("./bundleRules");
 const discountRules = require("./discountRules");
 const { priceCheckout } = require("./checkout");
+const { pricePosLine } = require("./posLine");
 
-module.exports = { money, dealRules, bundleRules, discountRules, priceCheckout };
+module.exports = { money, dealRules, bundleRules, discountRules, priceCheckout, pricePosLine };

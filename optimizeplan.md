@@ -575,7 +575,7 @@ Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS
 - [x] POS returns: do the return-quantity check plus stock inside one transaction (`posController.js:311-349`). — **done:** `returnPosSaleItems` runs in `withTx` (5 concurrent returns on 2 sold → exactly 2); manual compensation only on standalone servers
 
 ### 4.2 Checkout and pricing (P1)
-- [x] `services/pricing.js`: **one** implementation of line pricing, discounts, deals (BOGO), bundles, tax, rounding and shipping. Today it is written 6 times, each slightly differently: `placeOrder`, `editOrder`, `buildInvoice`, `buildQuote` (no flat discount, different rounding, so quote → invoice totals can differ), `savePosSale` and PO `buildItems`. Discount math is triplicated inside `productController` (`:418-457,534,561`). — **mostly done:** `services/pricing/index.js` + roundMoney on quote/order; invoice/POS/PO formulas still diverge (documented). `test/pricingGoldenP1.test.js`
+- [x] `services/pricing.js`: **one** implementation of line pricing, discounts, deals (BOGO), bundles, tax, rounding and shipping. Today it is written 6 times, each slightly differently: `placeOrder`, `editOrder`, `buildInvoice`, `buildQuote` (no flat discount, different rounding, so quote → invoice totals can differ), `savePosSale` and PO `buildItems`. Discount math is triplicated inside `productController` (`:418-457,534,561`). — **mostly done:** `services/pricing/index.js` + `pricePosLine` shared with POS; invoice/quote/PO formulas still diverge by design (documented). `test/pricingGoldenP1.test.js`
 - [x] `placeOrder` as one transaction: — **done:** stock (conditional) + deal usage (`usageLimit` atomic, `perUserLimit`) + counter number + `Order.create` + draft completion commit together; events fire only after commit. Steps 1–4 and 6–8 are done. Still open: step 5, discount usage recording (the Discount schema has no `usageCount`, §2.5). Tested in `test/placeOrderPricing.test.js` (rollback, deal limit, standalone fallback)
   1. load variants, products, deals and bundles with **`$in` (no N+1)**
   2. compute prices on the server
@@ -586,7 +586,7 @@ Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS
   7. `Order.create`
   8. complete the draft
 - [x] Idempotency: a unique partial `{storeId, checkout_draft_id}` or an `Idempotency-Key` header, so a double-click cannot create two orders. — **done:** `Order.idempotency_key` with a unique partial `{storeId, idempotency_key}`; checkout sends one key per attempt (reset after success); a repeat or a concurrent duplicate returns the existing order (`replayed: true`). Tested with 5 concurrent submits → 1 order
-- [x] Split `placeOrder` (470 lines, 100 of them card validation), `savePosSale` (310), `recordReturn` (185) and `getFinanceOverview` (190) into service functions. — **done:** `orderService.placeOrderCore`, `posService.recordReturn`, `financeService` overview. savePosSale extract deferred.
+- [x] Split `placeOrder` (470 lines, 100 of them card validation), `savePosSale` (310), `recordReturn` (185) and `getFinanceOverview` (190) into service functions. — **done:** `orderService.placeOrderCore`, `posService.recordReturn` + `savePosSale`, `financeService` overview.
 - [x] Invoice `recordPayment` and `recordPOPayment`: use a conditional `$inc` on `amount_paid` with `remaining_balance >= amount`, inside a transaction (today concurrent payments can overpay). — **done:** invoice payment is a conditional `findOneAndUpdate` on `amount_paid` (409 `INVOICE_CHANGED`); PO payment is a conditional PO update plus the `PurchasePayment` create in one `withTx` (409 `PO_CHANGED`); the vendor balance comes only from the full recompute. `test/moneyConcurrency.test.js`: 5 concurrent payments → 1
 - [x] Shipping config and active rules: cache per store (Redis, invalidated on write), since every quote currently re-reads them (`shippingController.js:14,40`). Remove `supportsTx()`'s `admin.hello()` call on every PO delivery. — **done:** 45s in-memory cache + invalidate on write; hello already gone.
 
@@ -598,9 +598,9 @@ Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS
 - [x] Per-list status counts: orders (6 counts), deals (7), invoices (5), quotes (5), discounts (4), vendors (4 plus aggregate plus distinct), banners (6 plus 2 distinct). Replace each with **one** `$group` by status, or a `$facet`. — **done:** `utils/statusCounts.js` wired on those admin lists. `test/queryPerfP1.test.js`
 
 ### 4.4 Catalog (P3)
-- [x] `getProducts` (310 lines, 5 response paths) becomes a `productQueryService` with one paginated path. The public endpoint always paginates and has a max limit. — **partly done:** public always paginates; summary fields reduce aggregates; full service extract still open.
-- [x] Keyset (cursor) pagination on `{created_at, _id}` for large admin lists, instead of `skip`. Keep `skip` only for the first few pages if the UI needs page numbers. — **partly done:** `utils/keysetPaginate.js` + admin orders `?cursor=` pilot; other lists still skip.
-- [x] Category subtree: compute the tree once per store and cache it (Redis, invalidated on category write). Today it is loaded and walked on every filtered request and copy-pasted 3 times (`productController.js:237,1207,1356`). Alternatively, store `ancestors: [ObjectId]` on Category and filter with `{storeId, ancestors: id}`. — **partly done:** `ancestors` on Category + maintain/rebuild + product filter fast path; Redis tree cache still open. `scripts/backfillCategoryAncestors.js`
+- [x] `getProducts` (310 lines, 5 response paths) becomes a `productQueryService` with one paginated path. The public endpoint always paginates and has a max limit. — **done:** `services/productQueryService` owns filter/subtree/shop params; public always paginates.
+- [x] Keyset (cursor) pagination on `{created_at, _id}` for large admin lists, instead of `skip`. Keep `skip` only for the first few pages if the UI needs page numbers. — **done:** orders + POS sales + invoices `?cursor=`; page/skip kept.
+- [x] Category subtree: compute the tree once per store and cache it (Redis, invalidated on category write). Today it is loaded and walked on every filtered request and copy-pasted 3 times (`productController.js:237,1207,1356`). Alternatively, store `ancestors: [ObjectId]` on Category and filter with `{storeId, ancestors: id}`. — **done:** `ancestors` + `utils/categoryTreeCache` on public/options; invalidate on write. `scripts/backfillCategoryAncestors.js`
 - [x] Search: build a `search_text` field (name, brand, category, SKUs, lowercased) on Product, maintained by `productSummary`. Use **prefix-anchored** `^term` matching on it, or a `{storeId:1, search_text:"text"}` text index. Move to Atlas Search later if you go to Atlas. This replaces the 4-branch unanchored `$or` (`:286-304`). — **done:** prefix on `search_text` + legacy fallback.
 - [x] `getProductById` (public): — **mostly done:** ratings from Product summary fields; PO history already admin-only.
   - remove the "legacy tag healing" writes (`:1563-1597`)
@@ -615,7 +615,7 @@ Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS
   - `updateAttributeCategories`: two `updateMany` calls (`attributeController.js:480-518`)
   - `getAllTags` creator resolution: use `hydrate`
 - [x] `getStockOverview`: one `$facet` over Variant with `{storeId}` instead of a giant `$in` plus 6 scans (`stockController.js:110-163`). — **done.**
-- [x] POS product search: query Product and Variant with the index, `limit 20` and prefix search. Today it loads the **whole catalog on every keystroke** (`posController.js:49-99`). `getPosReturns` unwinds the whole PosSale collection 3 times (`:265-288`). — **mostly done:** POS search DB-paginated + search_text cap 20; getPosReturns still open.
+- [x] POS product search: query Product and Variant with the index, `limit 20` and prefix search. Today it loads the **whole catalog on every keystroke** (`posController.js:49-99`). `getPosReturns` unwinds the whole PosSale collection 3 times (`:265-288`). — **done:** POS search DB-paginated; getPosReturns reads `SaleReturn` (+ PosSale join; legacy unwind fallback).
 
 ### 4.5 Sales, CRM and the rest (P3)
 - [x] Add `.lean()` to every read-only query. There are 211 `find(` calls and 353 `.lean()` calls, but `placeOrder`, brand, variant and bundle reads, and the theme admin are missing it. — **mostly done:** hot paths touched this phase use lean; full sweep still open.
@@ -685,7 +685,7 @@ backend/
   - E11000 → 409
   - multer errors → 413/400
   - everything else → 500, with a generic message and the details logged
-- [x] Remove about 415 try/catch blocks module by module. — **partly done:** contact/page → asyncHandler; 57× raw 500 `error.message` sanitized; remaining catch blocks gradual.
+- [x] Remove about 415 try/catch blocks module by module. — **partly done:** contact/page/POS writes → asyncHandler; 57× raw 500 `error.message` sanitized; remaining catch blocks gradual.
 - [x] One response envelope: — **partly done:** error envelope standardized; success envelopes still mixed.
   - `{ success: true, data, meta? }` / `{ success: false, code, message, errors? }`
   - Pagination `meta`: always `{ page, limit, total, totalPages }`, or `{ nextCursor }`
@@ -708,8 +708,8 @@ backend/
   - unused `adminMiddleware`
 - [x] Use consistent permission keys (`chat`, `categories`, `newsletter`) and migrate the existing Employee docs. — **done:** alias map + `scripts/migratePermissionKeys.js` (dry-run / `--apply`).
 - [x] Use audience-specific middleware: `requireUser` or `requireAdmin` on every route instead of the generic `authMiddleware`, which accepts either (chat, shipping quote, `/users/me|profile|password`, `sellerApplicationRoutes`). — **partly done:** chat inbox/customer pilots; mixed user/employee routes unchanged.
-- [x] Auth cost per request: select only the fields auth needs (`_id storeId role permissions status is_deleted seller_pending name`), and cache the principal for 30–60s in Redis, invalidated on employee update or status change. The global limiter currently **verifies the JWT up to 4 times** per request before auth verifies it again (`rateLimit.js:164-251`). Verify once and put the result on `req`. — **mostly done:** slim select + `verifyAccessOnce` shared by rateLimit/auth; Redis principal cache still open. `test/authSlimP1.test.js`
-- [x] Merge the duplicated auth flows into `services/auth.js`: — **partly done:** `toPublicUser` + `issueSession` stub; full login/OTP merge still open.
+- [x] Auth cost per request: select only the fields auth needs (`_id storeId role permissions status is_deleted seller_pending name`), and cache the principal for 30–60s in Redis, invalidated on employee update or status change. The global limiter currently **verifies the JWT up to 4 times** per request before auth verifies it again (`rateLimit.js:164-251`). Verify once and put the result on `req`. — **done:** slim select + `verifyAccessOnce` + `utils/principalCache` (Redis/memory, invalidate on employee update/delete). `test/authSlimP1.test.js`
+- [x] Merge the duplicated auth flows into `services/auth.js`: — **mostly done:** `toPublicUser` + `issueSession` + `authenticateCustomer`/`authenticateAdmin` used by user/admin/customer auth controllers; OTP/refresh still in controllers.
   - 5 login handlers
   - 3 refresh handlers
   - 3 OTP issue/send implementations

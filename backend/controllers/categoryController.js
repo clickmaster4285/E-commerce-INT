@@ -14,6 +14,7 @@ const { getChanges } = require("../utils/activityHelper");
 const { queueTranslationSync } = require("../utils/translationService");
 const { countProductsUsingCategory } = require("../services/referentialCleanup");
 const { hydrate } = require("../utils/hydrate");
+const { getTree: getCachedCategoryTree, invalidateTree: invalidateCategoryTree } = require("../utils/categoryTreeCache");
 
 // Populated attribute ke saath `translations` zaroori — attribute ka `name`
 // translate hota hai aur options ke labels `values[].label_translations` me
@@ -489,6 +490,7 @@ const createCategory = async (req, res) => {
 
 
     emitSocketEvent("categoryCreated", category.toObject());
+    invalidateCategoryTree(req.store?._id);
 
     return res.status(201).json({ success: true, message: "Category created successfully", data: category });
   } catch (error) {
@@ -695,6 +697,7 @@ const updateCategory = async (req, res) => {
     queueTranslationSync(Category, updatedCategory._id);
 
     emitSocketEvent("categoryUpdated", updatedCategory.toObject());
+    invalidateCategoryTree(req.store?._id);
 
     return res.status(200).json({
       success: true,
@@ -825,6 +828,7 @@ const deleteCategory = async (req, res) => {
     await category.save();
 
     emitSocketEvent("categoryDeleted", { id: String(category._id) });
+    invalidateCategoryTree(req.store?._id);
 
     return res.status(200).json({ success: true, message: "Category deleted successfully" });
   } catch (error) {
@@ -840,10 +844,13 @@ const deleteCategory = async (req, res) => {
 const getPublicCategories = async (req, res) => {
   try {
     // ⚠️ `is_active` filter ZAROORI hai — deactivate hui category storefront se gayab honi chahiye
-    const categories = await Category.find({ is_deleted: false, is_active: true })
-      .select("name description parent_category_id category_type sort_order created_at translations")
-      .sort({ sort_order: 1, name: 1 })
-      .lean();
+    // §4.4 Redis/memory tree cache (invalidate on create/update/delete)
+    const categories = await getCachedCategoryTree(req.store?._id, "public", () =>
+      Category.find({ is_deleted: false, is_active: true })
+        .select("name description parent_category_id category_type sort_order created_at translations")
+        .sort({ sort_order: 1, name: 1 })
+        .lean(),
+    );
 
     res.status(200).json({ success: true, data: categories, count: categories.length });
   } catch (error) {
@@ -911,10 +918,12 @@ const categoryListItem = (category, locale) => {
 const getCategoryOptions = async (req, res) => {
   try {
     const locale = selectedLocale(req.query.locale);
-    const categories = await Category.find({ is_deleted: false })
-      .select("name category_code parent_category_id translations")
-      .sort({ sort_order: 1, name: 1 })
-      .lean();
+    const categories = await getCachedCategoryTree(req.store?._id, "options", () =>
+      Category.find({ is_deleted: false })
+        .select("name category_code parent_category_id translations")
+        .sort({ sort_order: 1, name: 1 })
+        .lean(),
+    );
     const data = categories.map((category) => ({
       _id: category._id,
       name: category.name,

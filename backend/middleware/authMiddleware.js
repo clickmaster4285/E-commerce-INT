@@ -17,6 +17,7 @@ const Employee = require("../models/Employee");
 const log = require("../utils/logger");
 const { AUDIENCES } = require("../utils/tokens");
 const { verifyAccessOnce } = require("../utils/authPayload");
+const { getPrincipal } = require("../utils/principalCache");
 
 // ----------------------------------------------------------
 // PERMISSION KEY ALIASES (checkPermission.js ke PERMISSION_ALIASES + routes)
@@ -79,8 +80,10 @@ const createAuth = (allowedAudiences) => async (req, res, next) => {
       return res.status(401).json({ success: false, message: "This session does not belong to this store." });
     }
 
-    // Tenant-scoped lookup: store host par sirf isi store ka record milta hai
-    const entity = await MODEL_FOR[aud]().findById(decoded.userId).select(PRINCIPAL_SELECT).lean();
+    // Tenant-scoped lookup + Redis/memory principal cache (§5.4)
+    const entity = await getPrincipal(aud, decoded.userId, () =>
+      MODEL_FOR[aud]().findById(decoded.userId).select(PRINCIPAL_SELECT).lean(),
+    );
 
     if (!entity || entity.is_deleted) {
       return res.status(401).json({ success: false, message: "User not found or deleted" });

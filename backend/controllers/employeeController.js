@@ -792,6 +792,10 @@ exports.updateEmployee = async (req, res) => {
       }
     }
 
+    try {
+      require("../utils/principalCache").invalidateEmployee(employee._id);
+    } catch (_) { /* cache optional */ }
+
     return res.json({
       success: true,
       message: "Employee updated successfully",
@@ -845,6 +849,9 @@ exports.deleteEmployee = async (
     employee.updatedby = performerId;
 
     await employee.save();
+    try {
+      require("../utils/principalCache").invalidateEmployee(employee._id);
+    } catch (_) { /* cache optional */ }
 
     if (req.io) {
       req.io.emit(

@@ -105,72 +105,21 @@ const revokeOtherSessions = (req, userType, subjectId) =>
 // Rules bilkul createUser wale hain (verified User, pending seller, PendingRegistration clashes)
 // taake user ko aakhri step ke bajaye pehle step par hi pata chal jaye.
 
+const { authenticateAdmin, issueSession, toPublicUser } = require("../services/auth");
+
 const loginAdmin = async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password)
-      return res
-        .status(400)
-        .json({ success: false, message: "Please provide email and password" });
-    // Store host: isi store ka staff (tenant-scoped, email per-store unique).
-    // Platform host: koi store nahi → sirf seller OWNER (Option A: ek email ek store).
-    let employee;
-    if (req.store) {
-      employee = await Employee.findOne({ email: String(email).toLowerCase().trim() }).select("-activities");
-    } else {
-      const found = await findPlatformEmployee(email);
-      if (found.ambiguous) {
-        return res.status(409).json({
-          success: false,
-          message: "This email is linked to more than one store. Please sign in from your store's address.",
-        });
-      }
-      employee = found.employee;
-    }
-    if (!employee)
-      return res
-        .status(401)
-        .json({ success: false, message: "User not found" });
-    if (!employee.password)
-      return res
-        .status(401)
-        .json({ success: false, message: "Password incorrect" });
-    if (!isStaffRole(employee.role))
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Admin access denied. Please use customer login page.",
-        });
-    if (employee.status === "inactive" || employee.is_deleted)
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Your account is inactive. Please contact administrator.",
-        });
-    const isValid = await bcrypt.compare(password, employee.password);
-    if (!isValid)
-      return res
-        .status(401)
-        .json({ success: false, message: "Password incorrect" });
-    const io = req.io || getIO();
-    // Keep the activity audit, but don't make a successful login wait for
-    // secondary activity fan-out writes across the staff collection.
-
-    await tokens.issueSession(req, res, "admin", employee);
+    const auth = await authenticateAdmin({
+      email: req.body?.email,
+      password: req.body?.password,
+      store: req.store,
+    });
+    if (!auth.ok) return res.status(auth.status).json(auth.body);
+    await issueSession(req, res, "admin", auth.employee);
     res.json({
       success: true,
       message: "Admin login successful",
-      user: {
-        id: employee._id,
-        name: employee.name,
-        username: employee.username,
-        phone: employee.phone,
-        email: employee.email,
-        role: employee.role,
-        avatar: employee.avatar || null,
-      },
+      user: toPublicUser(auth.employee),
     });
   } catch (error) {
     log.error("loginAdmin error:", error);
