@@ -704,16 +704,37 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
  * Request ka wait nahi karta — user ko turant response milta hai,
  * translation peeche generate hota hai.
  */
-function queueTranslationSync(Model, docId) {
-  if (!isEnabled()) return;
-  setImmediate(async () => {
+// jobs/queue.js (in-process, dedupe by jobId) — ek hi doc par bar bar save ho to
+// ek hi sync pending rehta hai (pehle har save par alag setImmediate).
+const TRANSLATION_JOB = "translation";
+let translationJobRegistered = false;
+function ensureTranslationJob(queue) {
+  if (translationJobRegistered) return;
+  queue.register(TRANSLATION_JOB, async ({ Model, docId }) => {
     try {
       await syncDocumentTranslations(Model, docId);
     } catch (error) {
-      // Translation failure kabhi original save ko fail nahi karta.
+      // Translation failure kabhi original save ko fail nahi karta (retry bhi nahi — LibreTranslate band ho to spam).
       log.error(`[translation] ${Model.modelName} sync failed:`, error?.message || error);
     }
   });
+  translationJobRegistered = true;
+}
+
+/** jobId = model:id:<hash(fields)> — fields na do to sirf model:id ka hash */
+function translationJobId(Model, docId, fields) {
+  const list = Array.isArray(fields) ? [...fields].sort().join(",") : "";
+  const hash = crypto.createHash("md5").update(list).digest("hex").slice(0, 8);
+  return `${Model.modelName}:${String(docId)}:${hash}`;
+}
+
+function queueTranslationSync(Model, docId, fields) {
+  if (!isEnabled()) return;
+  const queue = require("../jobs/queue");
+  // queue.queue.has check ke baad bhi translationJobRegistered tests me _reset() se gir sakta hai
+  if (!queue._hasHandler?.(TRANSLATION_JOB)) translationJobRegistered = false;
+  ensureTranslationJob(queue);
+  queue.add(TRANSLATION_JOB, { Model, docId }, { jobId: translationJobId(Model, docId, fields) }).catch(() => {});
 }
 
 /**
@@ -789,5 +810,6 @@ module.exports = {
   cleanCategoryDescription,
   syncDocumentTranslations,
   queueTranslationSync,
+  translationJobId,
   backfillTranslations,
 };

@@ -3,6 +3,7 @@ import FallbackImage from "@/components/common/FallbackImage";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { toUserMessage } from "@/lib/toUserMessage";
 import { Check, ChevronDown, Clock3, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { productApi } from "@/apis/admin/productApi";
@@ -19,7 +20,7 @@ function handlePermissionError(error, defaultMessage, resource = "resource", t =
     toast.error(title, { duration: 6000, description });
     return;
   }
-  toast.error(message || defaultMessage);
+  toast.error(toUserMessage(error, defaultMessage));
 }
 
 function normalizeId(value) {

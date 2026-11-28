@@ -77,7 +77,7 @@ const getCustomersAdmin = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "customerController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -97,7 +97,7 @@ const searchCustomers = async (req, res) => {
 
     res.status(200).json({ success: true, data: customers });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "customerController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -167,7 +167,7 @@ const getCustomerById = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "customerController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -190,7 +190,7 @@ const createCustomer = async (req, res) => {
 
     res.status(201).json({ success: true, data: customer });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "customerController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -226,7 +226,7 @@ const updateCustomer = async (req, res) => {
     }
     res.status(200).json({ success: true, data: customer });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "customerController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -240,7 +240,7 @@ const deleteCustomer = async (req, res) => {
     await customer.save();
     res.status(200).json({ success: true, message: "Customer deleted" });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "customerController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 

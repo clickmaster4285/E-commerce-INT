@@ -20,6 +20,7 @@ const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 const { sendOtpEmail } = require("../utils/sendEmail");
 const log = require("../utils/logger");
+const { persistAvatar } = require("../utils/avatarFiles");
 const { normalizePhone, isValidPhone } = require("../utils/phoneValidator");
 const { suggestUsernames, uniqueUsername } = require("../utils/username");
 const { validateStoreAddress, slugifySubdomain } = require("../utils/tenantHost");
@@ -766,6 +767,14 @@ const updateProfile = async (req, res) => {
     if (phone !== undefined) update.phone = phone;
     if (dob !== undefined) update.dob = dob;
     if (preferences !== undefined) update.preferences = preferences;
+    // Avatar data URL aaye to file me badlo (§3.6) — DB me sirf URL
+    if (req.body.avatar !== undefined) {
+      try {
+        update.avatar = (await persistAvatar(req, req.body.avatar)) || (userType === "employee" ? "" : null);
+      } catch (avatarError) {
+        return res.status(400).json({ success: false, message: `Profile picture: ${avatarError.message}` });
+      }
+    }
 
     await Model.findByIdAndUpdate(userId, update);
     // ✅ Store fields sirf 'store' permission par (admin bypass)
@@ -794,7 +803,7 @@ const updateProfile = async (req, res) => {
     }
     res
       .status(500)
-      .json({ success: false, message: "Save failed: " + error.message });
+      .json({ success: false, message: "Save failed. Please try again." });
   }
 };
 
@@ -1306,7 +1315,7 @@ const createCheckoutDraft = async (req, res) => {
       paymentMethod: paymentMethod || "cod",
       saved: false,
       status: "active",
-      items: Array.isArray(items) ? items : [],
+      items: Array.isArray(items) ? items.slice(0, 50) : [], // max 50 (typed schema cap)
       subtotal: finiteDraftAmount(subtotal),
       shipping: finiteDraftAmount(shipping),
       tax: finiteDraftAmount(tax),
@@ -1491,7 +1500,7 @@ const updateCheckoutDraft = async (req, res) => {
     if (shippingMethod) set["drafts.$.shippingMethod"] = shippingMethod;
     if (paymentMethod) set["drafts.$.paymentMethod"] = paymentMethod;
     if (saved !== undefined) set["drafts.$.saved"] = saved;
-    if (Array.isArray(items)) set["drafts.$.items"] = items;
+    if (Array.isArray(items)) set["drafts.$.items"] = items.slice(0, 50); // max 50 (typed schema cap)
     for (const [field, value] of Object.entries({ subtotal, shipping, tax, discount, estimatedTotal })) {
       if (value !== undefined && Number.isFinite(Number(value))) set[`drafts.$.${field}`] = Number(value);
     }

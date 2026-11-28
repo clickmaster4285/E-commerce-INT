@@ -16,7 +16,7 @@ const getStoreInfo = async (req, res) => {
     res.status(200).json({ success: true, data: store.toObject() });
   } catch (error) {
     log.error("Get Store Error:", error);
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "storeController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -150,7 +150,7 @@ const updateStoreInfo = async (req, res) => {
     });
   } catch (error) {
     log.error("Update Store Error:", error);
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "storeController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -223,7 +223,7 @@ const getPublicStoreInfo = async (req, res) => {
     return res.status(200).json({ success: true, data: publicStorePayload(store) });
   } catch (error) {
     log.error("Get Public Store Error:", error);
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "storeController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -266,7 +266,7 @@ const checkSubdomain = async (req, res) => {
     });
   } catch (error) {
     log.error("Check Subdomain Error:", error);
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "storeController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -337,11 +337,31 @@ const updateStoreDomain = async (req, res) => {
     });
   } catch (error) {
     log.error("Update Store Domain Error:", error);
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "storeController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
+// ==========================================================
+// POST /store/logo — multipart logo upload (createImageUpload middleware routes me lagta hai)
+// Socket base64 path (deprecated) ki jagah REST. Purana logo file save kamyab hone ke baad hata di jati hai.
+// ==========================================================
+const uploadStoreLogo = async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, code: "LOGO_REQUIRED", message: "Logo file is required (field: logo)" });
+  }
+  const existing = await Store.findOne().select("logo.img_url").lean();
+  const previousLogoUrl = existing?.logo?.img_url || "";
+  res.on("finish", () => {
+    if (res.statusCode >= 400 || !previousLogoUrl) return;
+    const { localPathForUrl } = require("../utils/uploadPaths");
+    const absolute = localPathForUrl(req, previousLogoUrl);
+    if (absolute && absolute !== req.file.path) require("fs").promises.unlink(absolute).catch(() => {});
+  });
+  req.body = req.body || {};
+  return updateStoreInfo(req, res);
+};
+
 module.exports = {
-  getStoreInfo, updateStoreInfo,
+  getStoreInfo, updateStoreInfo, uploadStoreLogo,
   getPublicStoreInfo, resolveTenant, checkSubdomain, updateStoreDomain,
 };

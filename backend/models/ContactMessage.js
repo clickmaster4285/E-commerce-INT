@@ -17,12 +17,22 @@ const contactMessageSchema = new mongoose.Schema(
     locale: { type: String, default: "en", maxlength: 10 },
     page: { type: String, default: "", maxlength: 300 },
   },
-  { timestamps: true, collection: "contact_messages" },
+  // §3.7 convention: created_at / updated_at. Purane docs me createdAt/updatedAt stored hain —
+  // controller DTO (toDto) dono ko dual-read karta hai (FE nahi tootta).
+  { timestamps: { createdAt: "created_at", updatedAt: "updated_at" }, collection: "contact_messages" },
 );
 
 // ── Multi-tenant ──
 contactMessageSchema.plugin(tenantScope);
-contactMessageSchema.index({ storeId: 1, createdAt: -1 });
-contactMessageSchema.index({ storeId: 1, status: 1, createdAt: -1 });
+contactMessageSchema.index({ storeId: 1, created_at: -1 });
+contactMessageSchema.index({ storeId: 1, createdAt: -1 }); // legacy docs
+contactMessageSchema.index({ storeId: 1, status: 1, created_at: -1 });
+
+/** Lean doc → FE DTO: createdAt/updatedAt dual-read (legacy docs me created_at nahi hota) */
+contactMessageSchema.statics.toDto = (doc) => (doc ? {
+  ...doc,
+  createdAt: doc.created_at || doc.createdAt,
+  updatedAt: doc.updated_at || doc.updatedAt,
+} : doc);
 
 module.exports = mongoose.model("ContactMessage", contactMessageSchema);

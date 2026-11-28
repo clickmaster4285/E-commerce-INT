@@ -358,7 +358,35 @@ const deleteVariant = async (req, res) => {
   }
 };
 
+// ==========================================
+// Routes se shift kiye hue middleware (§5.1) — image upload se pehle product id chahiye
+// ==========================================
+
+// CREATE: product id body se
+const setCreateProductId = (req, res, next) => {
+  req.productId = req.body.product_id;
+  next();
+};
+
+// UPDATE: product id existing variant se
+const setUpdateProductId = async (req, res, next) => {
+  try {
+    const variant = await Variant.findById(req.params.id);
+
+    if (!variant) {
+      return res.status(404).json({ message: "Variant not found" });
+    }
+
+    req.productId = variant.product_id;
+    next();
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
+  setCreateProductId,
+  setUpdateProductId,
   createVariant,
   getVariants,
   getVariantPicker,

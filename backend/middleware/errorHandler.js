@@ -11,6 +11,7 @@
 
 const log = require("../utils/logger");
 const AppError = require("../utils/AppError");
+const { captureError } = require("../utils/errorTracker");
 
 function classify(err) {
   if (err instanceof AppError) {
@@ -60,7 +61,11 @@ function errorHandler(err, req, res, next) {
     path: req.originalUrl,
     storeId: req.store?._id ? String(req.store._id) : undefined,
   };
-  if (status >= 500) log.error(logPayload, "Unhandled request error");
+  if (status >= 500) {
+    log.error(logPayload, "Unhandled request error");
+    // §7.1: optional Sentry (SENTRY_DSN + @sentry/node) / global.__errorTracker — 5xx hi
+    captureError(err, { reqId: req.id, method: req.method, path: req.originalUrl, storeId: logPayload.storeId });
+  }
   else log.warn({ reqId: req.id, code, path: req.originalUrl }, message);
 
   if (res.headersSent) return undefined;

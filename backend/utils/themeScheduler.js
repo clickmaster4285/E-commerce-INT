@@ -12,6 +12,7 @@
 const cron = require("node-cron");
 const StoreTheme = require("../models/StoreTheme");
 const { runUnscoped, runWithStore } = require("./tenantContext");
+const { withLeaderLock } = require("./leaderLock");
 
 let task = null;
 let running = false;
@@ -75,7 +76,8 @@ async function runOnce({ now = new Date(), publish } = {}) {
 
 function start() {
   if (task) return task;
-  task = cron.schedule("* * * * *", () => runOnce());
+  // Leader lock (Redis) — Redis na ho to single-instance jaisa hi chalta hai
+  task = cron.schedule("* * * * *", () => withLeaderLock("theme", () => runOnce()));
   return task;
 }
 

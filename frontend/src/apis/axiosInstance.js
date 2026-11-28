@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { notifySellerPendingLocked } from "@/apis/sellerPendingToast";
 import { alignBackendUrl } from "@/lib/tenantHost";
 import { hasAuthSession } from "@/lib/authSession";
+import { toUserMessage } from "@/lib/toUserMessage";
 
 // ==========================================================
 // API BASE URL — single source of truth (frontend/.env driven)
@@ -151,6 +152,8 @@ function createAuthHttp({ refreshUrl, publicAuthPaths, mode, guestBlockedPaths =
     (response) => response,
     async (error) => {
       const originalRequest = error.config;
+      // Friendly text callers use karein: toast.error(err.userMessage)
+      try { if (error && typeof error === "object") error.userMessage = toUserMessage(error); } catch { /* ignore */ }
 
       if (error.response?.status === 403 && error.response?.data?.code === "SELLER_PENDING") {
         notifySellerPendingLocked();

@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const tenantScope = require("../utils/tenantScopePlugin");
+const { cartItemSchema, maxItemsValidator } = require("./shared/cartItemSchema");
 
 const cartSchema = new mongoose.Schema(
   {
@@ -8,8 +9,8 @@ const cartSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    // ✅ Mixed = poora item object as-is save hoga (deal fields bhi)
-    items: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    // ✅ Typed subschema (strict:false) — deal fields bhi as-is save hote hain, max 50 items
+    items: { type: [cartItemSchema], default: [], validate: maxItemsValidator },
   },
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } },
 );

@@ -13,6 +13,7 @@ const { logActivity, activityRow, clientInfo } = require("../utils/superAdminAct
 const SuperAdminActivity = require("../models/SuperAdminActivity");
 const { storeAdminBaseUrl } = require("../utils/storeUrl");
 const { escapeRegex } = require("../utils/escapeRegex");
+const { readPlatformTotals } = require("../services/storeStats"); // PlatformStats counters (§4.3)
 
 // Seller ka employee: application ke store me (resume-flow wale purane records
 // bina storeId ke bhi ho sakte hain — woh seller_pending se pehchane jate hain)
@@ -167,6 +168,7 @@ const meSuperAdmin = (req, res) => {
 
 const getDashboard = async (req, res) => {
   try {
+    const platformTotals = await readPlatformTotals(); // null = stale/missing → live counts
     const [
       totalUsers,
       totalSellers,
@@ -178,9 +180,10 @@ const getDashboard = async (req, res) => {
       recentRequests,
       recentUsers,
     ] = await Promise.all([
-      User.countDocuments({ is_deleted: { $ne: true }, role: "user" }),
-      SellerApplication.countDocuments({ status: "approved" }),
-      Store.countDocuments(),
+      // PlatformStats fresh ho to wahi (cheap); warna live count (fallback)
+      platformTotals?.customers ?? User.countDocuments({ is_deleted: { $ne: true }, role: "user" }),
+      platformTotals?.sellers ?? SellerApplication.countDocuments({ status: "approved" }),
+      platformTotals?.stores ?? Store.countDocuments(),
       SellerApplication.countDocuments({ status: "pending" }),
       SellerApplication.countDocuments({ status: "approved" }),
       SellerApplication.countDocuments({ status: "rejected" }),
@@ -1096,11 +1099,13 @@ const listUsers = async (req, res) => {
     if (role && String(role) === "user") filter.role = "user";
     if (status && ["active", "blocked", "inactive"].includes(String(status))) filter.status = String(status);
     if (search) {
-      const pattern = new RegExp(escapeRegex(String(search)), "i");
+      // ✅ Prefix-anchored (^) — index-friendly; "contains" search nahi
+      const pattern = new RegExp(`^${escapeRegex(String(search).trim())}`, "i");
       filter.$or = [{ name: pattern }, { email: pattern }, { username: pattern }];
     }
 
     const Order = require("../models/Order");
+    const platformTotals = await readPlatformTotals(); // null = stale/missing → live counts
     const [users, total, counts] = await Promise.all([
       User.find(filter)
         .sort({ created_at: -1 })
@@ -1112,7 +1117,7 @@ const listUsers = async (req, res) => {
       User.countDocuments(filter),
       // Tabs ke counts — search/filter se independent
       Promise.all([
-        User.countDocuments(base),
+        platformTotals?.customers ?? User.countDocuments(base), // PlatformStats fresh ho to wahi
         User.countDocuments({ ...base, status: "active" }),
         User.countDocuments({ ...base, status: "blocked" }),
       ]).then(([all, active, blocked]) => ({ all, active, blocked })),
@@ -1749,14 +1754,26 @@ const activityFeed = async (actorId, query = {}) => {
   const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
   const startOfWeek = new Date(startOfDay); startOfWeek.setDate(startOfWeek.getDate() - 6);
 
-  const [items, total, byType, today, week, all] = await Promise.all([
+  // ✅ SuperAdminActivity (index: {actor.id, created_at}) — 6 alag scans ki jagah 3 queries:
+  // items + filtered total + ek aggregate (type-wise, today, week — teeno ek hi pass me)
+  const [items, total, byType] = await Promise.all([
     SuperAdminActivity.find(filter).sort({ created_at: -1 }).skip((pageNum - 1) * limitNum).limit(limitNum).lean(),
     SuperAdminActivity.countDocuments(filter),
-    SuperAdminActivity.aggregate([{ $match: base }, { $group: { _id: "$entityType", count: { $sum: 1 } } }]),
-    SuperAdminActivity.countDocuments({ ...base, created_at: { $gte: startOfDay } }),
-    SuperAdminActivity.countDocuments({ ...base, created_at: { $gte: startOfWeek } }),
-    SuperAdminActivity.countDocuments(base),
+    SuperAdminActivity.aggregate([
+      { $match: base },
+      {
+        $group: {
+          _id: "$entityType",
+          count: { $sum: 1 },
+          today: { $sum: { $cond: [{ $gte: ["$created_at", startOfDay] }, 1, 0] } },
+          week: { $sum: { $cond: [{ $gte: ["$created_at", startOfWeek] }, 1, 0] } },
+        },
+      },
+    ]),
   ]);
+  const all = byType.reduce((sum, row) => sum + row.count, 0);
+  const today = byType.reduce((sum, row) => sum + row.today, 0);
+  const week = byType.reduce((sum, row) => sum + row.week, 0);
   const counts = { all };
   for (const row of byType) counts[row._id] = row.count;
   return { items: items.map(activityRow), total, counts, stats: { today, week, all }, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) || 1 };

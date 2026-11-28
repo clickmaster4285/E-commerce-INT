@@ -18,6 +18,7 @@ import Cookies from "js-cookie";
 import LoginModal from "./LoginModal";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { clearSensitiveClientStorage } from "@/lib/clientStorage";
 import { useStoreTheme } from "@/storefront/ThemeProvider";
 import { useLocalized } from "@/i18n/localize";
 
@@ -411,6 +412,7 @@ export default function Header() {
     try {
       await userHttp.post("/users/logout");
     } catch {}
+    clearSensitiveClientStorage("user");
     queryClient.removeQueries({ queryKey: ["userProfile"] });
     setProfileOpen(false);
     setOpen(false);

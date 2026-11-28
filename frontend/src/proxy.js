@@ -31,13 +31,47 @@ const API_BASE = (
   process.env.NEXT_PUBLIC_SERVERURL ||
   ''
 ).trim().replace(/\/+$/, '');
-const STORE_CACHE_MS = 60 * 1000;
-const storeCache = new Map(); // host → { exists, expires }
+const STORE_CACHE_MS = 60 * 1000;          // store mila
+const STORE_MISS_CACHE_MS = 15 * 1000;     // backend ne clearly "not found" kaha
+const STORE_ERROR_CACHE_MS = 3 * 1000;     // 5xx / timeout / network — jaldi dobara try
+const STORE_CACHE_MAX = 1000;              // random Host headers se memory na phoole
+const storeCache = new Map();              // host → { exists, expires } (Map order = LRU)
+const storeInflight = new Map();           // host → Promise (same host ke concurrent resolves ek hon)
+
+function cacheGet(host) {
+  const hit = storeCache.get(host);
+  if (!hit) return undefined;
+  if (hit.expires <= Date.now()) {
+    storeCache.delete(host);
+    return undefined;
+  }
+  // LRU: dobara insert → sabse naya
+  storeCache.delete(host);
+  storeCache.set(host, hit);
+  return hit.exists;
+}
+
+function cacheSet(host, exists, ttl) {
+  storeCache.delete(host);
+  storeCache.set(host, { exists, expires: Date.now() + ttl });
+  while (storeCache.size > STORE_CACHE_MAX) {
+    storeCache.delete(storeCache.keys().next().value); // sabse purana
+  }
+}
 
 async function storeExists(host) {
-  const hit = storeCache.get(host);
-  if (hit && hit.expires > Date.now()) return hit.exists;
+  const cached = cacheGet(host);
+  if (cached !== undefined) return cached;
   if (!API_BASE) return false;
+  let pending = storeInflight.get(host);
+  if (!pending) {
+    pending = resolveStore(host).finally(() => storeInflight.delete(host));
+    storeInflight.set(host, pending);
+  }
+  return pending;
+}
+
+async function resolveStore(host) {
   try {
     // Localhost/platform address par call + asli host `x-store-host` me
     const res = await fetch(`${API_BASE}/store/resolve`, {
@@ -46,11 +80,17 @@ async function storeExists(host) {
       cache: 'no-store',
       signal: AbortSignal.timeout(3000),
     });
+    // 5xx = backend problem, "store nahi hai" nahi — bohat chhota cache
+    if (res.status >= 500) {
+      cacheSet(host, false, STORE_ERROR_CACHE_MS);
+      return false;
+    }
     const body = await res.json();
     const exists = Boolean(body?.data?.found);
-    storeCache.set(host, { exists, expires: Date.now() + STORE_CACHE_MS });
+    cacheSet(host, exists, exists ? STORE_CACHE_MS : STORE_MISS_CACHE_MS);
     return exists;
   } catch {
+    cacheSet(host, false, STORE_ERROR_CACHE_MS);
     return false; // resolve fail → store-not-found (exist assume mat karo)
   }
 }
@@ -125,6 +165,11 @@ export async function proxy(request) {
   // /landing kholne par "/" par bhej dete hain (address bar me /landing nahi aata)
   if (pathname === '/') return rewrite('/landing');
   if (pathname === '/landing') return redirect('/');
+  // 🔒 Super admin: login page ke ilawa sa_sess marker (token nahi) chahiye.
+  // Asli auth backend + client shell karta hai; ye sirf jaldi redirect hai.
+  if (matches(pathname, ['/super-admin']) && pathname !== '/super-admin/login' && !has('sa_sess') && !has('sa_at')) {
+    return redirect('/super-admin/login');
+  }
   if (matches(pathname, PLATFORM_ALLOWED)) return pass();
 
   // Storefront, /admin/* waghera platform par nahi — landing par wapas

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { toUserMessage } from "@/lib/toUserMessage";
 import { userHttp } from "@/apis/axiosInstance";
 import { addressApi } from "@/apis/user/addressApi";
 import dynamic from "next/dynamic";
@@ -606,7 +607,7 @@ function CheckoutContent() {
       restoreItems(snap);
       setDraftItems([]);
       setSelectedKeys(snap.map((item) => item.key));
-      toast.error(e.response?.data?.message || t("checkout.draft.saveFailed"));
+      toast.error(toUserMessage(e, t("checkout.draft.saveFailed")));
       return;
     } finally {
       draftCreateInFlight.current = false;
@@ -855,7 +856,7 @@ function CheckoutContent() {
       await userHttp.put("/users/phone", { phone: normalizedPhone });
       queryClient.invalidateQueries({ queryKey: ["userProfile"] });
       toast.success(t("checkout.phone.saved"));
-    } catch (e) { toast.error(e.response?.data?.message || t("checkout.phone.saveFailed")); }
+    } catch (e) { toast.error(toUserMessage(e, t("checkout.phone.saveFailed"))); }
     finally { savingPhoneRef.current = false; setSavingPhone(false); }
   };
 
@@ -897,7 +898,7 @@ function CheckoutContent() {
       queryClient.invalidateQueries({ queryKey: ["addresses"] });
       if (selectedAddressId === id) setSelectedAddressId(null);
       toast.success(t("checkout.address.deleted"));
-    } catch (e) { toast.error(e.response?.data?.message || t("checkout.address.deleteFailed")); }
+    } catch (e) { toast.error(toUserMessage(e, t("checkout.address.deleteFailed"))); }
   };
 
   const placeOrder = async () => {
@@ -974,7 +975,7 @@ function CheckoutContent() {
         );
         toast.error(t("checkout.order.priceChanged"));
       } else {
-        toast.error(e.response?.data?.message || t("checkout.order.placeFailed"));
+        toast.error(toUserMessage(e, t("checkout.order.placeFailed")));
       }
       placingRef.current = false;
       setPlacing(false);

@@ -8,9 +8,11 @@ const {
   updateVariant,
   deleteVariant,
   getNextSkuNumber,
+  setCreateProductId,
+  setUpdateProductId,
 } = require("../controllers/variantController");
 
-const Variant = require("../models/Variant");
+
 
 // Sirf admin/employee session (a_at) — customer token yahan 401
 const authMiddleware = require("../middleware/authMiddleware").requireAdmin;
@@ -29,33 +31,7 @@ const router = express.Router();
 const dropProductsCache = invalidateOn("products"); // 2xx ke BAAD drop
 
 
-// Product ID set for CREATE
-const setCreateProductId = (req, res, next) => {
-  req.productId = req.body.product_id;
-  next();
-};
-
-
-// Product ID find for UPDATE
-const setUpdateProductId = async (req, res, next) => {
-  try {
-    const variant = await Variant.findById(req.params.id);
-
-    if (!variant) {
-      return res.status(404).json({
-        message: "Variant not found",
-      });
-    }
-
-    req.productId = variant.product_id;
-
-    next();
-  } catch (error) {
-    res.status(500).json({
-      message: error.message,
-    });
-  }
-};
+// setCreateProductId / setUpdateProductId ab variantController me hain (§5.1)
 
 
 // CREATE

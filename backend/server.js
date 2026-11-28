@@ -38,9 +38,6 @@ const HOST = process.env.HOST;
 const API_PREFIX = process.env.API_PREFIX;
 const SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS);
 const UPLOAD_DIR = process.env.UPLOAD_DIR;
-const STORE_UPLOAD_SUBDIR = process.env.STORE_UPLOAD_SUBDIR;
-const BUNDLE_UPLOAD_SUBDIR = process.env.BUNDLE_UPLOAD_SUBDIR;
-const REVIEW_UPLOAD_SUBDIR = process.env.REVIEW_UPLOAD_SUBDIR;
 const STARTUP_MESSAGE = process.env.SERVER_STARTUP_MESSAGE;
 
 const server = http.createServer(app);
@@ -84,10 +81,9 @@ app.set("io", io); // app.js → req.io
 // ==========================================
 const uploadDir = path.join(__dirname, UPLOAD_DIR);
 const createUploadDirectories = () => {
-  const dirs = [uploadDir, path.join(uploadDir, STORE_UPLOAD_SUBDIR)];
-  // Legacy shared folders (purane uploads) — naye uploads uploads/stores/<id>/ me jate hain
-  if (BUNDLE_UPLOAD_SUBDIR) dirs.push(path.join(uploadDir, BUNDLE_UPLOAD_SUBDIR));
-  if (REVIEW_UPLOAD_SUBDIR) dirs.push(path.join(uploadDir, REVIEW_UPLOAD_SUBDIR));
+  // Sirf root + uploads/stores — legacy shared folders (store/, bundles/, reviews/ ...) ab nahi bante;
+  // naye uploads uploads/stores/<id>/<kind>/ me jate hain (§6.4). Purani files: scripts/migrateLegacyUploads.js
+  const dirs = [uploadDir, path.join(uploadDir, "stores")];
   for (const dir of dirs) if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 };
 

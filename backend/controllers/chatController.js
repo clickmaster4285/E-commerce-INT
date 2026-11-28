@@ -209,7 +209,7 @@ exports.openForOrder = async (req, res) => {
     }
     if (!created && contextUpdated && req.io) await emitConversation(req.io, conversation._id);
     res.status(created ? 201 : 200).json({ success: true, data: { ...conversation, order } });
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+  } catch (error) { (require("../utils/logger").error({ err: error }, "chatController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." })); }
 };
 
 exports.openGeneral = async (req, res) => {
@@ -234,7 +234,7 @@ exports.openGeneral = async (req, res) => {
     }
     const row = await populateConversation(ChatConversation.findById(conversation._id).lean(), true);
     res.status(created ? 201 : 200).json({ success: true, data: publicConversation(row) });
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+  } catch (error) { (require("../utils/logger").error({ err: error }, "chatController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." })); }
 };
 
 exports.updateInquiryContext = async (req, res) => {
@@ -269,7 +269,7 @@ exports.updateInquiryContext = async (req, res) => {
     if (req.io) await emitConversation(req.io, conversation._id);
     const row = await populateConversation(ChatConversation.findById(conversation._id).lean(), true);
     res.json({ success: true, data: publicConversation(row) });
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+  } catch (error) { (require("../utils/logger").error({ err: error }, "chatController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." })); }
 };
 
 exports.startGuest = async (req, res) => {
@@ -301,7 +301,7 @@ exports.startGuest = async (req, res) => {
     }
     const row = await populateConversation(ChatConversation.findById(conversation._id).lean(), true);
     res.status(201).json({ success: true, data: { token, conversation: publicConversation(row) } });
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+  } catch (error) { (require("../utils/logger").error({ err: error }, "chatController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." })); }
 };
 
 exports.getGuestMine = async (req, res) => {
@@ -312,7 +312,7 @@ exports.getGuestMine = async (req, res) => {
     if (!conversation) return fail(res, 404, "Guest conversation not found");
     const row = await populateConversation(ChatConversation.findById(conversation._id).lean(), true);
     res.json({ success: true, data: { conversation: publicConversation(row) } });
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+  } catch (error) { (require("../utils/logger").error({ err: error }, "chatController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." })); }
 };
 
 exports.requireGuestChat = async (req, res, next) => {
@@ -338,7 +338,7 @@ exports.listMine = async (req, res) => {
         .lean(),
     );
     res.json({ success: true, data: rows.map(publicConversation) });
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+  } catch (error) { (require("../utils/logger").error({ err: error }, "chatController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." })); }
 };
 
 exports.getConversation = async (req, res) => {
@@ -347,7 +347,7 @@ exports.getConversation = async (req, res) => {
     if (!conversation) return;
     const row = await populateConversation(ChatConversation.findById(conversation._id).lean(), true);
     res.json({ success: true, data: publicConversation(row) });
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+  } catch (error) { (require("../utils/logger").error({ err: error }, "chatController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." })); }
 };
 
 exports.listAdmin = async (req, res) => {
@@ -373,12 +373,12 @@ exports.listAdmin = async (req, res) => {
       populateConversation(ChatConversation.find(filter).sort({ last_message_at: -1, updated_at: -1 }).skip((page - 1) * limit).limit(limit).lean()),
     ]);
     res.json({ success: true, data: rows.map(publicConversation), pagination: { total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) } });
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+  } catch (error) { (require("../utils/logger").error({ err: error }, "chatController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." })); }
 };
 
 exports.unreadCount = async (req, res) => {
   try { if (!isStaff(req)) return fail(res, 403, "Support access required"); res.json({ success: true, data: { count: await adminUnreadCount() } }); }
-  catch (error) { res.status(500).json({ success: false, message: error.message }); }
+  catch (error) { (require("../utils/logger").error({ err: error }, "chatController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." })); }
 };
 
 // GET /chats/admin/counts — one round-trip for inbox tab badges (§9.3)
@@ -393,7 +393,7 @@ exports.adminCounts = async (req, res) => {
     ]);
     res.json({ success: true, data: { all, unread, open, closed } });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "chatController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -413,7 +413,7 @@ exports.getMessages = async (req, res) => {
     const hasMore = rows.length > limit;
     const items = rows.slice(0, limit).reverse();
     res.json({ success: true, data: { items, hasMore, nextCursor: hasMore ? items[0]?._id : null } });
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+  } catch (error) { (require("../utils/logger").error({ err: error }, "chatController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." })); }
 };
 
 exports.sendMessage = async (req, res) => {
@@ -455,7 +455,7 @@ exports.sendMessage = async (req, res) => {
       await emitAdminUnread(req.io);
     }
     res.status(201).json({ success: true, data: message.toObject() });
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+  } catch (error) { (require("../utils/logger").error({ err: error }, "chatController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." })); }
 };
 
 exports._buildMessageContext = buildMessageContext;
@@ -474,7 +474,7 @@ exports.markRead = async (req, res) => {
       await emitAdminUnread(req.io);
     }
     res.json({ success: true, data: { conversation_id: String(conversation._id), reader_type: reader } });
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+  } catch (error) { (require("../utils/logger").error({ err: error }, "chatController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." })); }
 };
 
 exports.updateStatus = async (req, res) => {

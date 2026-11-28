@@ -1,72 +1,35 @@
-const sharp = require("sharp");
-const fs = require("fs-extra");
-const path = require("path");
 const mongoose = require("mongoose");
-const { uploadDirFor, uploadUrlFor } = require("../utils/uploadPaths");
-
-// ✅ Same shared multer config jo product images ke liye use hota hai (memory storage)
-const upload = require("../config/uploadConfig");
+const { createImageUpload } = require("./imageUpload");
 
 // Single manual cover image — field name: "image"
-const bundleImageUpload = upload.single("image");
+// createImageUpload factory (§5.6): memory multer → magic-bytes → sharp WebP →
+// uploads/stores/<storeId>/bundles/<bundleId>/
+// Update → route id | Create → naya ObjectId (folder naam = bundle._id, product jaisa)
+const bundleImageUpload = createImageUpload({
+  fields: "image",
+  kind: "bundles",
+  idFrom: (req) => {
+    if (!req.bundleId) req.bundleId = req.params?.id || new mongoose.Types.ObjectId();
+    return String(req.bundleId);
+  },
+  resize: { w: 1000, h: 1000, fit: "inside" },
+  quality: 88,
+});
 
-// ==========================================
-// 🖼️ PROCESS BUNDLE COVER IMAGE
-// Product images ki tarah: sharp se resize + webp compress,
-// file uploads/bundles/<bundleId>/ me save hoti hai.
-// ==========================================
-const processBundleImage = async (req, res, next) => {
-  try {
-    // Image nahi aayi (update par purani image rakhne ke liye) to skip —
-    // "required" validation controller me hoti hai.
-    if (!req.file) return next();
-
-    // Update → route id | Create → naya ObjectId (folder naam = bundle._id, product jaisa)
-    const bundleId =
-      req.params.id || req.bundleId || new mongoose.Types.ObjectId();
-
-    req.bundleId = bundleId;
-
-    // Store ka apna folder: uploads/stores/<storeId>/bundles/<bundleId>
-    const uploadFolder = uploadDirFor(req, "bundles", bundleId.toString());
-
-    await fs.ensureDir(uploadFolder);
-
-    const fileName = `cover_${Date.now()}.webp`;
-    const filePath = path.join(uploadFolder, fileName);
-
-    await sharp(req.file.buffer)
-      .resize({
-        width: 1000,
-        height: 1000,
-        fit: "inside",
-        withoutEnlargement: true,
-      })
-      .webp({ quality: 88 })
-      .toFile(filePath);
-
-    const metadata = await sharp(filePath).metadata();
-    const stats = await fs.stat(filePath);
-
-    // ✅ Store hone wala path (DB me string ke roop me jata hai)
-    req.bundleImage = uploadUrlFor(filePath).slice(1);
-
-    // Metadata (agar kabhi zarurat pade)
-    req.bundleImageMeta = {
-      img_url: `/${req.bundleImage}`,
-      img_size: stats.size,
-      mimeType: "image/webp",
-      width: metadata.width,
-      height: metadata.height,
-    };
-
-    next();
-  } catch (error) {
-    return res.status(400).json({
-      success: false,
-      message: error.message || "Bundle image processing failed",
-    });
-  }
+// Factory ke baad: req.file → req.bundleImage (DB path, leading slash ke bina) + meta
+// Image nahi aayi (update par purani rakhne ke liye) to skip — "required" validation controller me.
+const processBundleImage = (req, res, next) => {
+  if (!req.file) return next();
+  req.bundleImage = req.file.img_url.slice(1);
+  req.bundleImageMeta = {
+    img_url: req.file.img_url,
+    img_size: req.file.img_size,
+    mimeType: "image/webp",
+    width: req.file.width,
+    height: req.file.height,
+  };
+  return next();
 };
 
 module.exports = { bundleImageUpload, processBundleImage };
+

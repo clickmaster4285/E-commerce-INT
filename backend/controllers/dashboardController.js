@@ -469,7 +469,7 @@ const getDashboardStats = async (req, res) => {
 
   } catch (error) {
     log.error("❌ [getDashboardStats] Error:", error);
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "dashboardController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 

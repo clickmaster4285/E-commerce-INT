@@ -2,7 +2,7 @@ const express = require("express");
 // Sirf admin/employee session (a_at) — customer token yahan 401
 const authMiddleware = require("../middleware/authMiddleware").requireAdmin;
 const { requirePermission } = require("../middleware/checkPermission");
-const { getFinanceOverview } = require("../controllers/financeController");
+const { getFinanceOverview, listLedgerTransactions } = require("../controllers/financeController");
 
 const router = express.Router();
 
@@ -14,5 +14,7 @@ const requireFinancePermission = requirePermission("finance", {
 });
 
 router.get("/overview", authMiddleware, requireFinancePermission, getFinanceOverview);
+// Ledger-based transactions list (§9.2) — khali ledger par []
+router.get("/transactions", authMiddleware, requireFinancePermission, listLedgerTransactions);
 
 module.exports = router;

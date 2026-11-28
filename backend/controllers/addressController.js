@@ -18,7 +18,7 @@ const getMyAddresses = async (req, res) => {
       .lean();
     res.status(200).json({ success: true, data: addresses });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "addressController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -98,7 +98,7 @@ const deleteAddress = async (req, res) => {
     if (!address) return res.status(404).json({ success: false, message: "Address not found" });
     res.status(200).json({ success: true, message: "Address deleted" });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "addressController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -114,7 +114,7 @@ const setDefaultAddress = async (req, res) => {
 
     res.status(200).json({ success: true, data: address });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "addressController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 

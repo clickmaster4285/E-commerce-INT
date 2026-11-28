@@ -11,6 +11,7 @@
     "test": "node --test",
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "migrate:legacy-uploads": "node scripts/migrateLegacyUploads.js",
     "migrate:indexes": "node scripts/migrateTenantIndexes.js",
     "migrate:attributes": "node scripts/migrateAttributesPerStore.js",
     "backfill:is-deleted": "node scripts/backfillIsDeleted.js",
@@ -30,6 +31,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@socket.io/redis-adapter": "^8.3.0",
     "bcryptjs": "^3.0.3",
     "compression": "^1.8.2",
     "cookie-parser": "^1.4.7",

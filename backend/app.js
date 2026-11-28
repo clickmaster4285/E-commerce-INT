@@ -201,6 +201,9 @@ app.use(API_PREFIX, (req, res, next) => {
   return limiters.global(req, res, next);
 });
 
+// 🔒 Cross-store CSRF: Origin host == API host (opt-in ENFORCE_ORIGIN_CHECK=1, middleware/originCheck.js)
+app.use(API_PREFIX, require("./middleware/originCheck"));
+
 // Multi-tenant: Host header → req.tenant / req.store (block nahi karta)
 app.use(API_PREFIX, resolveStore);
 
@@ -249,47 +252,85 @@ app.use((req, res, next) => { req.io = app.get("io") || null; next(); });
 // ==========================================
 // ROUTES
 // ==========================================
-app.use(`${API_PREFIX}/categories`, require("./routes/categoryRoutes"));
-app.use(`${API_PREFIX}/brands`, require("./routes/brandRoutes"));
-app.use(`${API_PREFIX}/products`, require("./routes/productRoutes"));
-app.use(`${API_PREFIX}/users`, require("./routes/userRoutes"));
-app.use(`${API_PREFIX}/variants`, require("./routes/variantRoutes"));
-app.use(`${API_PREFIX}/store`, require("./routes/storeRoutes"));
-app.use(`${API_PREFIX}/employees`, require("./routes/employeeRoutes"));
-app.use(`${API_PREFIX}/discounts`, require("./routes/discountRoutes"));
-app.use(`${API_PREFIX}/deals`, require("./routes/dealRoutes"));
-app.use(`${API_PREFIX}/bundles`, require("./routes/bundleRoutes"));
-app.use(`${API_PREFIX}/tags`, require("./routes/tagRoutes"));
-app.use(`${API_PREFIX}/addresses`, require("./routes/addressRoutes"));
-app.use(`${API_PREFIX}/banners`, require("./routes/bannerRoutes"));
-app.use(`${API_PREFIX}/orders`, require("./routes/orderRoutes"));
-app.use(`${API_PREFIX}/cart`, require("./routes/cartRoutes"));
-app.use(`${API_PREFIX}/stock`, require("./routes/stockRoutes"));
-app.use(`${API_PREFIX}/reviews`, require("./routes/reviewRoutes"));
-app.use(`${API_PREFIX}/attributes`, require("./routes/attributeRoutes"));
-app.use(`${API_PREFIX}/shipping`, require("./routes/shippingRoutes"));
-app.use(`${API_PREFIX}/dashboard`, require("./routes/dashboardRoutes"));
-app.use(`${API_PREFIX}/vendors`, require("./routes/vendorRoutes"));
-app.use(`${API_PREFIX}/purchase-orders`, require("./routes/purchaseOrderRoutes"));
-app.use(`${API_PREFIX}/customers`, require("./routes/customerRoutes"));
-app.use(`${API_PREFIX}/leads`, require("./routes/leadRoutes"));
-app.use(`${API_PREFIX}/quotes`, require("./routes/quoteRoutes"));
-app.use(`${API_PREFIX}/invoices`, require("./routes/invoiceRoutes"));
-app.use(`${API_PREFIX}/pos`, require("./routes/posRoutes"));
-app.use(`${API_PREFIX}/finance`, require("./routes/financeRoutes"));
-app.use(`${API_PREFIX}/translations`, require("./routes/translationRoutes"));
-app.use(`${API_PREFIX}/chats`, require("./routes/chatRoutes"));
+// Routers ek jagah require (style unify) — mount neeche
+const categoryRoutes = require("./routes/categoryRoutes");
+const brandRoutes = require("./routes/brandRoutes");
+const productRoutes = require("./routes/productRoutes");
+const userRoutes = require("./routes/userRoutes");
+const variantRoutes = require("./routes/variantRoutes");
+const storeRoutes = require("./routes/storeRoutes");
+const employeeRoutes = require("./routes/employeeRoutes");
+const discountRoutes = require("./routes/discountRoutes");
+const dealRoutes = require("./routes/dealRoutes");
+const bundleRoutes = require("./routes/bundleRoutes");
+const tagRoutes = require("./routes/tagRoutes");
+const addressRoutes = require("./routes/addressRoutes");
+const bannerRoutes = require("./routes/bannerRoutes");
+const orderRoutes = require("./routes/orderRoutes");
+const cartRoutes = require("./routes/cartRoutes");
+const stockRoutes = require("./routes/stockRoutes");
+const reviewRoutes = require("./routes/reviewRoutes");
+const attributeRoutes = require("./routes/attributeRoutes");
+const shippingRoutes = require("./routes/shippingRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
+const vendorRoutes = require("./routes/vendorRoutes");
+const purchaseOrderRoutes = require("./routes/purchaseOrderRoutes");
+const customerRoutes = require("./routes/customerRoutes");
+const leadRoutes = require("./routes/leadRoutes");
+const quoteRoutes = require("./routes/quoteRoutes");
+const invoiceRoutes = require("./routes/invoiceRoutes");
+const posRoutes = require("./routes/posRoutes");
+const financeRoutes = require("./routes/financeRoutes");
+const translationRoutes = require("./routes/translationRoutes");
+const chatRoutes = require("./routes/chatRoutes");
+const themeRoutes = require("./routes/themeRoutes");
+const pageRoutes = require("./routes/pageRoutes");
+const subscriberRoutes = require("./routes/subscriberRoutes");
+const contactRoutes = require("./routes/contactRoutes");
+const superAdminRoutes = require("./routes/superAdminRoutes");
+const sellerApplicationRoutes = require("./routes/sellerApplicationRoutes");
+
+app.use(`${API_PREFIX}/categories`, categoryRoutes);
+app.use(`${API_PREFIX}/brands`, brandRoutes);
+app.use(`${API_PREFIX}/products`, productRoutes);
+app.use(`${API_PREFIX}/users`, userRoutes);
+app.use(`${API_PREFIX}/variants`, variantRoutes);
+app.use(`${API_PREFIX}/store`, storeRoutes);
+app.use(`${API_PREFIX}/employees`, employeeRoutes);
+app.use(`${API_PREFIX}/discounts`, discountRoutes);
+app.use(`${API_PREFIX}/deals`, dealRoutes);
+app.use(`${API_PREFIX}/bundles`, bundleRoutes);
+app.use(`${API_PREFIX}/tags`, tagRoutes);
+app.use(`${API_PREFIX}/addresses`, addressRoutes);
+app.use(`${API_PREFIX}/banners`, bannerRoutes);
+app.use(`${API_PREFIX}/orders`, orderRoutes);
+app.use(`${API_PREFIX}/cart`, cartRoutes);
+app.use(`${API_PREFIX}/stock`, stockRoutes);
+app.use(`${API_PREFIX}/reviews`, reviewRoutes);
+app.use(`${API_PREFIX}/attributes`, attributeRoutes);
+app.use(`${API_PREFIX}/shipping`, shippingRoutes);
+app.use(`${API_PREFIX}/dashboard`, dashboardRoutes);
+app.use(`${API_PREFIX}/vendors`, vendorRoutes);
+app.use(`${API_PREFIX}/purchase-orders`, purchaseOrderRoutes);
+app.use(`${API_PREFIX}/customers`, customerRoutes);
+app.use(`${API_PREFIX}/leads`, leadRoutes);
+app.use(`${API_PREFIX}/quotes`, quoteRoutes);
+app.use(`${API_PREFIX}/invoices`, invoiceRoutes);
+app.use(`${API_PREFIX}/pos`, posRoutes);
+app.use(`${API_PREFIX}/finance`, financeRoutes);
+app.use(`${API_PREFIX}/translations`, translationRoutes);
+app.use(`${API_PREFIX}/chats`, chatRoutes);
 // ── Store editor (theme draft/publish) + custom pages ──
-app.use(`${API_PREFIX}/theme`, require("./routes/themeRoutes"));
-app.use(`${API_PREFIX}/pages`, require("./routes/pageRoutes"));
+app.use(`${API_PREFIX}/theme`, themeRoutes);
+app.use(`${API_PREFIX}/pages`, pageRoutes);
 // ── Newsletter subscribers (store editor newsletter section) ──
-app.use(`${API_PREFIX}/newsletter`, require("./routes/subscriberRoutes"));
+app.use(`${API_PREFIX}/newsletter`, subscriberRoutes);
 // ── Contact form messages (store editor contact section) ──
-app.use(`${API_PREFIX}/contact`, require("./routes/contactRoutes"));
+app.use(`${API_PREFIX}/contact`, contactRoutes);
 // ── Super Admin module (separate namespace + auth) ──
-app.use(`${API_PREFIX}/super-admin`, require("./routes/superAdminRoutes"));
+app.use(`${API_PREFIX}/super-admin`, superAdminRoutes);
 // ── Public seller application (pending-review queue) ──
-app.use(`${API_PREFIX}/seller`, require("./routes/sellerApplicationRoutes"));
+app.use(`${API_PREFIX}/seller`, sellerApplicationRoutes);
 
 app.get("/", (req, res) => res.send(STARTUP_MESSAGE));
 app.get(`${API_PREFIX}/health`, (req, res) => {

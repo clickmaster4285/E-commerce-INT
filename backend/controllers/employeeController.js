@@ -5,6 +5,7 @@ const Employee = require("../models/Employee");
 const { validatePhone } = require("../utils/phoneValidator");
 const log = require("../utils/logger");
 const { escapeRegex } = require("../utils/escapeRegex");
+const { persistAvatar } = require("../utils/avatarFiles");
 const { parsePagination, paginationMeta } = require("../utils/paginate");
 const { nextSeq, formatNumber, maxNumericSuffix } = require("../utils/counter");
 
@@ -494,6 +495,12 @@ exports.createEmployee = async (req, res) => {
     if (!defaultStoreId) {
       return res.status(400).json({ success: false, message: "Store context is required to create an employee." });
     }
+    let avatarUrl = "";
+    try {
+      avatarUrl = (await persistAvatar(req, avatar)) || "";
+    } catch (avatarError) {
+      return res.status(400).json({ success: false, message: `Profile picture: ${avatarError.message}` });
+    }
 
     const employeeCode = await nextEmployeeCode();
 
@@ -505,7 +512,7 @@ exports.createEmployee = async (req, res) => {
       phone: sanitizedPhone,
       role,
       status,
-      avatar: avatar || "",
+      avatar: avatarUrl,
       permissions: fixPermissions(permissions || {}),
       preferences: preferences || { darkMode: true, notifications: { email: true, push: true, weekly: true } },
       employeeCode,
@@ -684,7 +691,12 @@ exports.updateEmployee = async (req, res) => {
             oldValue: employee[field] ? "(previous picture)" : "(empty)",
             newValue: updates[field] ? "(new picture)" : "(empty)",
           });
-          directUpdates[field] = updates[field] || "";
+          // data URL → file (§3.6); DB me sirf /uploads/... URL
+          try {
+            directUpdates[field] = (await persistAvatar(req, updates[field])) || "";
+          } catch (avatarError) {
+            return res.status(400).json({ success: false, message: `Profile picture: ${avatarError.message}` });
+          }
         } else {
           changes.push({
             field,

@@ -116,8 +116,9 @@ function createTenantIO(server) {
 
 // ==========================================
 // HELPER: COMPRESS & SAVE LOGO
-// TODO (§5.6/§9): store logo ab bhi base64-over-socket aata hai (sharp + async write,
-// loop block nahi). Poora fix: REST multipart PUT /store (createImageUpload) par shift.
+// @deprecated (§5.6/§9): base64-over-socket logo. REST multipart use karo:
+//   POST /store/logo  (field "logo")  ya  PUT /store (field "logo" + store fields).
+// Ye thin wrapper hai — wahi processImage helper jo createImageUpload use karta hai.
 // ==========================================
 const compressAndSaveLogo = async (base64Data, fileName) => {
   if (!base64Data || typeof base64Data !== "string") return null;
@@ -164,12 +165,10 @@ const compressAndSaveLogo = async (base64Data, fileName) => {
   const filePath = path.join(storeDir, finalName);
 
   try {
-    const sharp = require("sharp");
-    await sharp(rawBuffer)
-      .rotate() // EXIF orientation pehle
-      .resize(600, 600, { fit: "inside", withoutEnlargement: true })
-      .webp({ quality: 88, alphaQuality: 100, effort: 4 })
-      .toFile(filePath);
+    // Wahi shared helper jo REST (createImageUpload) use karta hai — magic-bytes + sharp WebP
+    const { processImage } = require("../middleware/imageUpload");
+    const processed = await processImage(rawBuffer, { resize: { w: 600, h: 600, fit: "inside" }, quality: 88 });
+    await fs.promises.writeFile(filePath, processed.buffer);
     const savedSize = await verifyFile(filePath, "WebP");
     return { path: filePath, filename: finalName, mimetype: "image/webp", size: savedSize, relativePath: relativeFor(filePath) };
   } catch (err) {
@@ -284,6 +283,34 @@ const needsPermissionMigration = (perms) => {
   return requiredKeys.some((key) => typeof perms[key] !== "boolean");
 };
 
+// Redis pub/sub adapter — optional; fail ho to in-memory par chalta rehta hai
+function attachRedisAdapter(ioServer) {
+  const redisUrl = String(process.env.REDIS_URL || "").trim();
+  if (!/^rediss?:\/\//i.test(redisUrl)) return false;
+  try {
+    const { createAdapter } = require("@socket.io/redis-adapter");
+    const base = require("../middleware/rateLimit").getRedisClient();
+    if (!base) return false;
+    // Adapter ko alag pub/sub connections chahiye (subscriber connection commands nahi chala sakta)
+    const pubClient = base.duplicate();
+    const subClient = base.duplicate();
+    let logged = false;
+    const onError = (err) => {
+      if (logged) return;
+      logged = true;
+      log.error("[socket] Redis adapter error:", err.message);
+    };
+    pubClient.on("error", onError);
+    subClient.on("error", onError);
+    ioServer.adapter(createAdapter(pubClient, subClient));
+    log.info("[socket] Redis adapter enabled");
+    return true;
+  } catch (error) {
+    log.error("[socket] Redis adapter load nahi hua, in-memory adapter use hoga:", error.message);
+    return false;
+  }
+}
+
 // ==========================================
 // SOCKET INITIALIZATION
 // ==========================================
@@ -292,15 +319,13 @@ const initSocket = (server) => {
 
   const uploadDir = path.join(__dirname, "../uploads");
   if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-  const storeUploadDir = path.join(uploadDir, "store");
-  if (!fs.existsSync(storeUploadDir)) fs.mkdirSync(storeUploadDir, { recursive: true });
 
   const allowedOriginsEnv = [process.env.ALLOWED_ORIGINS, process.env.CLIENT_URL]
     .filter(Boolean)
     .join(",");
   const allowedOrigins = allowedOriginsEnv.split(",").map(u => u.trim()).filter(Boolean);
 
-  io = createTenantIO(new Server(server, {
+  const ioServer = new Server(server, {
     cors: {
       origin: (origin, callback) => {
         if (!origin) return callback(null, true);
@@ -323,8 +348,17 @@ const initSocket = (server) => {
     maxHttpBufferSize: parseInt(process.env.SOCKET_MAX_BUFFER_MB, 10) * 1024 * 1024,
     pingTimeout: 60000,
     pingInterval: 25000,
-    transports: ["polling", "websocket"],
-  }));
+    // WebSocket-first: Redis adapter ke saath multi-instance par polling sticky-session mangti hai,
+    // is liye pehle websocket try hota hai (polling sirf fallback)
+    transports: ["websocket", "polling"],
+  });
+
+  // ==========================================
+  // REDIS ADAPTER (optimizeplan.md §6.1) — REDIS_URL ho to rooms/emit saare instances par
+  // pahunchte hain (store:<id>, store:<id>:admin, customer:<id>). Na ho to default in-memory.
+  // ==========================================
+  attachRedisAdapter(ioServer);
+  io = createTenantIO(ioServer);
 
   // ==========================================
   // TENANT RESOLUTION — handshake Host se store

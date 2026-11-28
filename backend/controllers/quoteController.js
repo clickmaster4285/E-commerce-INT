@@ -1,5 +1,6 @@
 const { statusCounts, sumCounts, facetCounts } = require("../utils/statusCounts"); // status tabs ke liye ek aggregate (§4.3)
 const mongoose = require("mongoose");
+const { roundMoney: round } = require("../utils/roundMoney"); // ek hi rounding (invoice jaisa)
 const { nextSeq, peekSeq, formatNumber, maxNumericSuffix } = require("../utils/counter"); // atomic per-store numbers
 const { randomUUID } = require("crypto");
 const Quote = require("../models/Quote");
@@ -43,7 +44,7 @@ exports.reserveQuoteNumber = async (req, res) => {
         if (error.code !== 11000 || attempt === 9) throw error;
       }
     }
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+  } catch (error) { (require("../utils/logger").error({ err: error }, "quoteController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." })); }
 };
 
 const buildQuote = (body = {}) => {
@@ -55,7 +56,7 @@ const buildQuote = (body = {}) => {
   if (expiryDate < quoteDate) throw new Error("Expiry date must be on or after the quote date");
   if (!Array.isArray(body.items) || !body.items.length) throw new Error("Add at least one product");
 
-  const round = (value) => Math.round(value * 100) / 100;
+  // round = roundMoney (utils/roundMoney.js) — invoice ke saath ek hi jagah ka rounding
   const items = body.items.map((item) => {
     const quantity = Number(item.quantity);
     const unitPrice = Number(item.unit_price);
@@ -170,7 +171,7 @@ exports.listQuotes = async (req, res) => {
       stats: { total, sent, accepted, rejected },
       pagination: { total: filteredTotal, page, limit, pages, hasNext: page < pages, hasPrev: page > 1 },
     });
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+  } catch (error) { (require("../utils/logger").error({ err: error }, "quoteController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." })); }
 };
 
 exports.getQuote = async (req, res) => {

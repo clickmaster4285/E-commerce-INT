@@ -9,11 +9,12 @@ const StorePage = require("../models/StorePage");
 const { sanitizeRichText } = require("../utils/themeValidator");
 const { invalidate } = require("../utils/publicCache");
 const { queueTranslationSync } = require("../utils/translationService");
+const AppError = require("../utils/AppError");
+const asyncHandler = require("../utils/asyncHandler");
 
 const MAX_PAGES = 50;
 const MAX_CONTENT = 100000;
 
-const fail = (res, status, message, extra = {}) => res.status(status).json({ success: false, message, ...extra });
 const actorId = (req) => (req.userType === "employee" && req.user?._id ? req.user._id : null);
 
 const slugify = (value) =>
@@ -69,112 +70,98 @@ const afterWrite = (req, doc, event) => {
 
 const duplicateSlug = (error) => error?.code === 11000;
 
+const notFound = () => new AppError("Page not found", { status: 404, code: "NOT_FOUND" });
+const slugTaken = () => new AppError("A page with this URL already exists", {
+  status: 409, code: "SLUG_TAKEN", details: { errors: { slug: "Already in use" } },
+});
+
 // ── PUBLIC: GET /pages/public — published pages list (menus / footer) ──
-exports.listPublicPages = async (req, res) => {
-  try {
-    const pages = await StorePage.find({ status: "published" })
-      .sort({ title: 1 })
-      .select("title slug translations.title")
-      .limit(MAX_PAGES)
-      .lean();
-    res.set("Cache-Control", "public, max-age=60");
-    return res.status(200).json({ success: true, data: pages });
-  } catch (error) {
-    return fail(res, 500, "Failed to load pages");
-  }
-};
+exports.listPublicPages = asyncHandler(async (req, res) => {
+  const pages = await StorePage.find({ status: "published" })
+    .sort({ title: 1 })
+    .select("title slug translations.title")
+    .limit(MAX_PAGES)
+    .lean();
+  res.set("Cache-Control", "public, max-age=60");
+  return res.status(200).json({ success: true, data: pages });
+});
 
 // ── PUBLIC: GET /pages/public/:slug ──
-exports.getPublicPage = async (req, res) => {
-  try {
-    const slug = slugify(req.params.slug);
-    if (!slug) return fail(res, 404, "Page not found");
-    const page = await StorePage.findOne({ slug, status: "published" })
-      .select("title slug content seo translations updatedAt")
-      .lean();
-    if (!page) return fail(res, 404, "Page not found");
-    res.set("Cache-Control", "public, max-age=60");
-    return res.status(200).json({ success: true, data: page });
-  } catch (error) {
-    return fail(res, 500, "Failed to load page");
-  }
-};
+exports.getPublicPage = asyncHandler(async (req, res) => {
+  const slug = slugify(req.params.slug);
+  if (!slug) throw notFound();
+  const page = await StorePage.findOne({ slug, status: "published" })
+    .select("title slug content seo translations updatedAt")
+    .lean();
+  if (!page) throw notFound();
+  res.set("Cache-Control", "public, max-age=60");
+  return res.status(200).json({ success: true, data: page });
+});
 
 // ── ADMIN: GET /pages/admin ──
-exports.listPages = async (req, res) => {
-  try {
-    const pages = await StorePage.find()
-      .sort({ updatedAt: -1 })
-      .select("title slug status seo updatedAt createdAt")
-      .lean();
-    return res.status(200).json({ success: true, data: pages });
-  } catch (error) {
-    return fail(res, 500, "Failed to load pages");
-  }
-};
+exports.listPages = asyncHandler(async (req, res) => {
+  const pages = await StorePage.find()
+    .sort({ updatedAt: -1 })
+    .select("title slug status seo updatedAt createdAt")
+    .lean();
+  return res.status(200).json({ success: true, data: pages });
+});
 
 // ── ADMIN: GET /pages/admin/:id ──
-exports.getPage = async (req, res) => {
-  try {
-    if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 404, "Page not found");
-    const page = await StorePage.findById(req.params.id).lean();
-    if (!page) return fail(res, 404, "Page not found");
-    return res.status(200).json({ success: true, data: page });
-  } catch (error) {
-    return fail(res, 500, "Failed to load page");
-  }
-};
+exports.getPage = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) throw notFound();
+  const page = await StorePage.findById(req.params.id).lean();
+  if (!page) throw notFound();
+  return res.status(200).json({ success: true, data: page });
+});
 
 // ── ADMIN: POST /pages/admin ──
-exports.createPage = async (req, res) => {
+exports.createPage = asyncHandler(async (req, res) => {
+  const { errors, data } = parsePageBody(req.body);
+  if (Object.keys(errors).length) throw new AppError("Invalid page", { status: 400, code: "VALIDATION_ERROR", details: { errors } });
+
+  const count = await StorePage.countDocuments({});
+  if (count >= MAX_PAGES) throw new AppError(`A store can have up to ${MAX_PAGES} pages.`, { status: 403, code: "PAGE_LIMIT" });
+
+  let page;
   try {
-    const { errors, data } = parsePageBody(req.body);
-    if (Object.keys(errors).length) return fail(res, 400, "Invalid page", { errors });
-
-    const count = await StorePage.countDocuments({});
-    if (count >= MAX_PAGES) return fail(res, 403, `A store can have up to ${MAX_PAGES} pages.`);
-
-    const page = await StorePage.create({ ...data, createdBy: actorId(req), updatedBy: actorId(req) });
-    afterWrite(req, page, "pageCreated");
-    return res.status(201).json({ success: true, data: page });
+    page = await StorePage.create({ ...data, createdBy: actorId(req), updatedBy: actorId(req) });
   } catch (error) {
-    if (duplicateSlug(error)) return fail(res, 409, "A page with this URL already exists", { errors: { slug: "Already in use" } });
-    return fail(res, 500, "Failed to create page");
+    if (duplicateSlug(error)) throw slugTaken();
+    throw error;
   }
-};
+  afterWrite(req, page, "pageCreated");
+  return res.status(201).json({ success: true, data: page });
+});
 
 // ── ADMIN: PUT /pages/admin/:id ──
-exports.updatePage = async (req, res) => {
-  try {
-    if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 404, "Page not found");
-    const { errors, data } = parsePageBody(req.body, { partial: true });
-    if (Object.keys(errors).length) return fail(res, 400, "Invalid page", { errors });
+exports.updatePage = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) throw notFound();
+  const { errors, data } = parsePageBody(req.body, { partial: true });
+  if (Object.keys(errors).length) throw new AppError("Invalid page", { status: 400, code: "VALIDATION_ERROR", details: { errors } });
 
-    const page = await StorePage.findByIdAndUpdate(
+  let page;
+  try {
+    page = await StorePage.findByIdAndUpdate(
       req.params.id,
       { $set: { ...data, updatedBy: actorId(req) } },
       { returnDocument: "after", runValidators: true },
     );
-    if (!page) return fail(res, 404, "Page not found");
-    afterWrite(req, page, "pageUpdated");
-    return res.status(200).json({ success: true, data: page });
   } catch (error) {
-    if (duplicateSlug(error)) return fail(res, 409, "A page with this URL already exists", { errors: { slug: "Already in use" } });
-    return fail(res, 500, "Failed to update page");
+    if (duplicateSlug(error)) throw slugTaken();
+    throw error;
   }
-};
+  if (!page) throw notFound();
+  afterWrite(req, page, "pageUpdated");
+  return res.status(200).json({ success: true, data: page });
+});
 
 // ── ADMIN: DELETE /pages/admin/:id ──
-exports.deletePage = async (req, res) => {
-  try {
-    if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 404, "Page not found");
-    const page = await StorePage.findByIdAndDelete(req.params.id);
-    if (!page) return fail(res, 404, "Page not found");
-    afterWrite(req, page, "pageDeleted");
-    return res.status(200).json({ success: true, data: { _id: page._id } });
-  } catch (error) {
-    return fail(res, 500, "Failed to delete page");
-  }
-};
-
+exports.deletePage = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) throw notFound();
+  const page = await StorePage.findByIdAndDelete(req.params.id);
+  if (!page) throw notFound();
+  afterWrite(req, page, "pageDeleted");
+  return res.status(200).json({ success: true, data: { _id: page._id } });
+});
 exports._internal = { parsePageBody, slugify };

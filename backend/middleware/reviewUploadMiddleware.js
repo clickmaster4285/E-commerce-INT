@@ -1,9 +1,5 @@
-const multer = require("../utils/tenantMulter") /* store-context safe multer */;
-const path = require("path");
-const fs = require("fs-extra");
-const sharp = require("sharp");
 const mongoose = require("mongoose");
-const { uploadDirFor, uploadUrlFor } = require("../utils/uploadPaths");
+const { createImageUpload } = require("./imageUpload");
 const Review = require("../models/Review");
 
 // ==========================================
@@ -17,36 +13,25 @@ const MAX_VIDEOS = 1;
 const MAX_IMAGE_SIZE = 8 * 1024 * 1024; // 8MB per image (optimizeplan.md §2.4)
 const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB per video
 
-const IMAGE_MIMES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-const VIDEO_MIMES = ["video/mp4", "video/webm", "video/quicktime"];
-
-const storage = multer.memoryStorage();
-
-const fileFilter = (req, file, cb) => {
-  if (file.fieldname === "images") {
-    if (!IMAGE_MIMES.includes(file.mimetype)) {
-      return cb(new Error("Only JPG, JPEG, PNG and WEBP images are allowed for reviews"), false);
-    }
-    return cb(null, true);
-  }
-  if (file.fieldname === "videos" || file.fieldname === "video") {
-    if (!VIDEO_MIMES.includes(file.mimetype)) {
-      return cb(new Error("Only MP4, WEBM or MOV videos are allowed for reviews"), false);
-    }
-    return cb(null, true);
-  }
-  return cb(new Error(`Unknown field: ${file.fieldname} (only images/videos allowed)`), false);
-};
-
-const reviewMediaUpload = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: MAX_VIDEO_SIZE, files: MAX_IMAGES + MAX_VIDEOS },
-}).fields([
-  { name: "images", maxCount: MAX_IMAGES },
-  { name: "videos", maxCount: MAX_VIDEOS },
-  { name: "video", maxCount: MAX_VIDEOS },
-]);
+// createImageUpload factory (§5.6): memory multer → magic-bytes → sharp WebP (images) /
+// video as-is (mp4/webm/mov sniffed) → uploads/stores/<storeId>/reviews/<productId>/
+// Per-image 8MB limit saveReviewMedia me file.originalSize se (factory limit video ke liye 50MB).
+const reviewMediaUpload = createImageUpload({
+  fields: [
+    { name: "images", maxCount: MAX_IMAGES },
+    { name: "videos", maxCount: MAX_VIDEOS },
+    { name: "video", maxCount: MAX_VIDEOS },
+  ],
+  kind: "reviews",
+  idFrom: (req) => {
+    const id = String(req.body?.product_id || req.params?.productId || "");
+    return mongoose.Types.ObjectId.isValid(id) ? id : "invalid"; // saveReviewMedia 400 deta hai, cleanup file hata deta hai
+  },
+  resize: { w: 1200, h: 1200, fit: "inside" },
+  quality: 85,
+  maxBytes: MAX_VIDEO_SIZE,
+  allowVideo: true,
+});
 
 // ==========================================
 // 💾 SAVE REVIEW MEDIA (uploads/reviews/<productId>/)
@@ -107,59 +92,29 @@ const saveReviewMedia = async (req, res, next) => {
       }
     }
 
-    // Store ka apna folder: uploads/stores/<storeId>/reviews/<productId>
-    const uploadDirectory = uploadDirFor(req, "reviews", String(productId));
-    await fs.ensureDir(uploadDirectory);
-
+    // Files factory me pehle hi save ho chuki hain (error par factory cleanup hata deta hai)
     const savedImages = [];
-    for (let i = 0; i < images.length; i++) {
-      const file = images[i];
-      if (file.size > MAX_IMAGE_SIZE) {
+    for (const file of images) {
+      if ((file.originalSize || file.size) > MAX_IMAGE_SIZE) {
         return res.status(400).json({
           success: false,
           message: `Image "${file.originalname}" exceeds the 8MB limit`,
         });
       }
-      const base = path
-        .basename(file.originalname, path.extname(file.originalname))
-        .replace(/[^a-zA-Z0-9-_]/g, "-")
-        .slice(0, 40) || "review";
-      const fileName = `${Date.now()}-${i}-${base}.webp`;
-      const filePath = path.join(uploadDirectory, fileName);
-      await sharp(file.buffer)
-        .resize({ width: 1200, height: 1200, fit: "inside", withoutEnlargement: true })
-        .webp({ quality: 85 })
-        .toFile(filePath);
-      const metadata = await sharp(filePath).metadata();
-      const stats = await fs.stat(filePath);
       savedImages.push({
-        img_url: uploadUrlFor(filePath),
-        img_size: stats.size,
+        img_url: file.img_url,
+        img_size: file.img_size,
         mimeType: "image/webp",
-        width: metadata.width || null,
-        height: metadata.height || null,
+        width: file.width || null,
+        height: file.height || null,
       });
     }
 
-    const savedVideos = [];
-    for (let i = 0; i < videos.length; i++) {
-      const file = videos[i];
-      if (file.size > MAX_VIDEO_SIZE) {
-        return res.status(400).json({
-          success: false,
-          message: `Video "${file.originalname}" exceeds the 50MB limit`,
-        });
-      }
-      const ext = path.extname(file.originalname).toLowerCase() || ".mp4";
-      const fileName = `${Date.now()}-video-${i}${ext}`;
-      const filePath = path.join(uploadDirectory, fileName);
-      await fs.writeFile(filePath, file.buffer);
-      savedVideos.push({
-        video_url: uploadUrlFor(filePath),
-        file_size: file.size,
-        mimeType: file.mimetype,
-      });
-    }
+    const savedVideos = videos.map((file) => ({
+      video_url: file.img_url,
+      file_size: file.img_size,
+      mimeType: file.mimeType,
+    }));
 
     req.reviewMedia = { images: savedImages, videos: savedVideos };
     next();

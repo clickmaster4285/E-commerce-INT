@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { getAdminSocket, disposeAdminSocket } from "@/hooks/admin/useAdminSocket";
 import AdminLanguageSwitcher from "@/components/adminComponents/AdminLanguageSwitcher";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { clearSensitiveClientStorage } from "@/lib/clientStorage";
 
 function getNavbarSocket() {
   return getAdminSocket();
@@ -161,6 +162,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
       console.error("Logout error:", e);
       toast.error(t("admin.navbar.logoutFailed"));
     } finally {
+      clearSensitiveClientStorage("admin"); // POS held carts, quote reservation (shared PC)
       // ✅ Step 1: Shared admin socket drop (Navbar/Sidebar/layout share one)
       disposeAdminSocket();
 

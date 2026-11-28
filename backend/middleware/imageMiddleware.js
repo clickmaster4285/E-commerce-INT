@@ -1,119 +1,34 @@
-const sharp = require("sharp");
-const fs = require("fs-extra");
-const path = require("path");
 const crypto = require("crypto");
-const { uploadDirFor, uploadUrlFor } = require("../utils/uploadPaths");
+const { createImageUpload } = require("./imageUpload");
 
+// Brand logo — createImageUpload factory (§5.6): field "logo", contain-fit 300x300,
+// uploads/stores/<storeId>/brands/<brandId>/. Route: `processBrandLogo.upload, processBrandLogo`.
+const brandLogoUpload = createImageUpload({
+  fields: "logo",
+  kind: "brands",
+  idFrom: (req) => {
+    // Update → route id | Create → naya id (controller req.brandId ko _id banata hai)
+    if (req.params?.id) return req.params.id;
+    if (!req.brandId) req.brandId = crypto.randomBytes(12).toString("hex");
+    return req.brandId;
+  },
+  resize: { w: 300, h: 300, fit: "contain", withoutEnlargement: false },
+  quality: 85,
+});
 
-
-const processBrandLogo = async (req, res, next) => {
-
-  try {
-
-
-    // image nahi hai to skip
-    if (!req.file) {
-      return next();
-    }
-
-
-
-    const isCreate = !req.params.id;
-    const brandId = req.params.id || crypto.randomBytes(12).toString("hex");
-
-
-
-    // Store ka apna folder: uploads/stores/<storeId>/brands/<brandId>
-    const uploadFolder = uploadDirFor(req, "brands", brandId);
-
-
-
-    await fs.ensureDir(uploadFolder);
-
-
-
-    const fileName =
-      `logo_${Date.now()}.webp`;
-
-
-
-    const filePath =
-      path.join(
-        uploadFolder,
-        fileName
-      );
-
-
-
-    // Logo resize + compress
-    await sharp(req.file.buffer)
-
-      .resize({
-        width: 300,
-        height: 300,
-        fit: "contain",
-      })
-
-      .webp({
-        quality: 85,
-      })
-
-      .toFile(filePath);
-
-
-
-
-    const metadata =
-      await sharp(filePath).metadata();
-
-
-
-    const stats =
-      await fs.stat(filePath);
-
-
-
-
-    req.brandImage = {
-
-      img_url:
-      uploadUrlFor(filePath).slice(1), // DB format bina leading slash
-
-      img_size:
-      stats.size,
-
-      mimeType:
-      "image/webp",
-
-      width:
-      metadata.width,
-
-      height:
-      metadata.height,
-
-    };
-
-    if (isCreate) req.brandId = brandId;
-
-    return next();
-
-
-
-  } catch(error){
-
-
-    res.status(400).json({
-
-      message:error.message
-
-    });
-
-
-  }
-
-
+// Factory ke baad: req.file → req.brandImage (DB format: leading slash ke bina)
+const processBrandLogo = (req, res, next) => {
+  if (!req.file) return next();
+  req.brandImage = {
+    img_url: req.file.img_url.slice(1),
+    img_size: req.file.img_size,
+    mimeType: "image/webp",
+    width: req.file.width,
+    height: req.file.height,
+  };
+  return next();
 };
 
-
-
+processBrandLogo.upload = brandLogoUpload;
 module.exports = processBrandLogo;
+

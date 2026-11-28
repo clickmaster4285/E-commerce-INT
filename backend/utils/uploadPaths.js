@@ -13,8 +13,32 @@
 // Filenames ab bhi unique (Date.now / random) — kabhi overwrite nahi.
 // ==========================================================
 
+// ==========================================================
+// OBJECT STORAGE (§6.4) — STORAGE_DRIVER=local|s3  (abhi sirf STUB)
+// ----------------------------------------------------------
+// Multi-instance par local disk shared nahi hota → files S3/R2 par jani chahiye. Abhi sab
+// code `uploadDirFor` + fs.writeFile par hai, is liye driver "s3" set ho tab bhi local disk
+// use hota hai (warning ke saath). Future driver interface (storageDriver()):
+//   put(absolutePath/key, buffer, { contentType }) → public url
+//   remove(key) · urlFor(key)
+// @aws-sdk koi dependency nahi — implement karte waqt hi add hogi.
+// ==========================================================
 const path = require("path");
 const { getStoreId } = require("./tenantContext");
+
+const STORAGE_DRIVERS = ["local", "s3"];
+let warnedS3Stub = false;
+function storageDriver() {
+  const name = String(process.env.STORAGE_DRIVER || "local").trim().toLowerCase();
+  const driver = STORAGE_DRIVERS.includes(name) ? name : "local";
+  if (name === "s3" && !warnedS3Stub) {
+    warnedS3Stub = true;
+    // lazy require: logger ← uploadPaths circular na bane
+    try { require("./logger").warn("[uploadPaths] STORAGE_DRIVER=s3 abhi implement nahi — local disk use ho rahi hai."); } catch (_) {}
+  }
+  // Stub: s3 bhi abhi local par chalta hai
+  return { name: driver, effective: "local" };
+}
 
 const UPLOAD_ROOT = path.resolve(__dirname, "..", process.env.UPLOAD_DIR || "uploads");
 const STORES_SEGMENT = "stores";
@@ -66,4 +90,4 @@ function localPathForUrl(req, url) {
   return absolute;
 }
 
-module.exports = { UPLOAD_ROOT, uploadDirFor, uploadUrlFor, localPathForUrl, storeIdFor };
+module.exports = { storageDriver, UPLOAD_ROOT, uploadDirFor, uploadUrlFor, localPathForUrl, storeIdFor };

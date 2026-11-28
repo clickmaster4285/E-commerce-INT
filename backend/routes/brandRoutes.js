@@ -13,7 +13,6 @@ const {
 // Sirf admin/employee session (a_at) — customer token yahan 401
 const authMiddleware = require("../middleware/authMiddleware").requireAdmin;
 const { checkPermission } = require("../middleware/checkPermission");
-const upload = require("../config/uploadConfig");
 const processBrandLogo = require("../middleware/imageMiddleware");
 const { publicCache } = require("../utils/publicCache");
 const { invalidateOn } = require("../middleware/invalidateOn");
@@ -36,8 +35,8 @@ router.get("/:id", getBrandById);
 // 🛡️ ADMIN ROUTES — token + permission
 // ==========================================
 router.get("/admin/all", authMiddleware, checkPermission("brands"), getBrandsAdmin);
-router.post("/", authMiddleware, checkPermission("brands"), dropBrandsCache, upload.single("logo"), processBrandLogo, createBrand);
-router.put("/:id", authMiddleware, checkPermission("brands"), dropBrandsCache, upload.single("logo"), processBrandLogo, updateBrand);
+router.post("/", authMiddleware, checkPermission("brands"), dropBrandsCache, processBrandLogo.upload, processBrandLogo, createBrand);
+router.put("/:id", authMiddleware, checkPermission("brands"), dropBrandsCache, processBrandLogo.upload, processBrandLogo, updateBrand);
 router.delete("/:id", authMiddleware, checkPermission("brands"), dropBrandsCache, deleteBrand);
 
 module.exports = router;

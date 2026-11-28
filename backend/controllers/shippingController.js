@@ -105,7 +105,7 @@ const getShippingConfig = async (req, res) => {
     const config = await ShippingConfig.getConfig();
     res.json({ success: true, data: config });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "shippingController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -120,7 +120,7 @@ const getActiveShippingRules = async (req, res) => {
       .lean();
     res.json({ success: true, data: rules });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "shippingController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -133,7 +133,7 @@ const quoteShipping = async (req, res) => {
     const result = await calculateShipping({ items, method, subtotal });
     res.json({ success: true, data: result });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "shippingController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -164,7 +164,7 @@ const updateShippingConfig = async (req, res) => {
     emit("shippingConfigUpdated", config);
     res.json({ success: true, message: "Shipping settings updated", data: config });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "shippingController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -177,7 +177,7 @@ const getShippingRules = async (req, res) => {
     const rules = await ShippingRule.find().sort({ createdAt: -1 }).limit(legacyCap(req.query.limit, 50)).lean();
     res.json({ success: true, data: rules });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "shippingController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -204,7 +204,7 @@ const createShippingRule = async (req, res) => {
     emit("shippingRuleCreated", rule);
     res.status(201).json({ success: true, data: rule });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "shippingController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -236,7 +236,7 @@ const updateShippingRule = async (req, res) => {
     emit("shippingRuleUpdated", rule);
     res.json({ success: true, data: rule });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "shippingController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -247,7 +247,7 @@ const deleteShippingRule = async (req, res) => {
     emit("shippingRuleDeleted", { id: req.params.id });
     res.json({ success: true, message: "Rule deleted" });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "shippingController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -261,7 +261,7 @@ const toggleShippingRule = async (req, res) => {
     emit("shippingRuleToggled", rule);
     res.json({ success: true, data: rule });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "shippingController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -276,7 +276,7 @@ const getActiveShippingMethods = async (req, res) => {
       .lean();
     res.json({ success: true, data: methods });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "shippingController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -285,7 +285,7 @@ const getShippingMethods = async (req, res) => {
     const methods = await ShippingMethod.find().sort({ createdAt: 1 }).lean();
     res.json({ success: true, data: methods });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "shippingController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -320,7 +320,7 @@ const createShippingMethod = async (req, res) => {
     if (error.code === 11000) {
       return res.status(400).json({ success: false, message: "A method with this name already exists" });
     }
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "shippingController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -347,7 +347,7 @@ const updateShippingMethod = async (req, res) => {
     emit("shippingMethodUpdated", method);
     res.json({ success: true, data: method });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "shippingController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -358,7 +358,7 @@ const deleteShippingMethod = async (req, res) => {
     emit("shippingMethodDeleted", { id: req.params.id });
     res.json({ success: true, message: "Method deleted" });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "shippingController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -372,7 +372,7 @@ const toggleShippingMethod = async (req, res) => {
     emit("shippingMethodToggled", method);
     res.json({ success: true, data: method });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "shippingController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 

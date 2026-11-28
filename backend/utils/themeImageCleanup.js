@@ -15,10 +15,12 @@ const cron = require("node-cron");
 const StoreTheme = require("../models/StoreTheme");
 const StoreThemeVersion = require("../models/StoreThemeVersion");
 const { runUnscoped } = require("./tenantContext");
+const { withLeaderLock } = require("./leaderLock");
 const { UPLOAD_ROOT } = require("./uploadPaths");
 
 const GRACE_MS = 24 * 60 * 60 * 1000;
-const SAFE_FILE = /^theme_[A-Za-z0-9_]+\.webp$/;
+// theme_<ts>_<hex>.webp (purana) + theme-<ts>-<hex>.webp (createImageUpload factory)
+const SAFE_FILE = /^theme[_-][A-Za-z0-9_-]+\.webp$/;
 
 /** Theme JSON me jitni bhi "/uploads/stores/<id>/theme/<file>" strings hain */
 function collectThemeFiles(value, storeId, out = new Set()) {
@@ -94,7 +96,7 @@ let task = null;
 function start() {
   if (task) return task;
   // Roz raat 03:30 (server time)
-  task = cron.schedule("30 3 * * *", () => runOnce());
+  task = cron.schedule("30 3 * * *", () => withLeaderLock("themeImageCleanup", () => runOnce()));
   return task;
 }
 

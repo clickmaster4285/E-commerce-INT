@@ -127,6 +127,23 @@ const nextConfig = {
         ? [{ key: 'Strict-Transport-Security', value: 'max-age=15552000' }]
         : []),
     ];
+    // 🔒 CSP REPORT-ONLY (kuch block nahi karta — sirf browser console me violations).
+    // Next inline scripts + theme bootstrap ki wajah se 'unsafe-inline' abhi zaroori;
+    // nonce-based enforced CSP proxy.js me alag step hai. Enforce karne se pehle
+    // console violations dekho (Google sign-in: accounts.google.com, images: backend host).
+    const cspReportOnly = [
+      "default-src 'self'",
+      `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'production' ? '' : " 'unsafe-eval'"} https://accounts.google.com https://apis.google.com`,
+      "style-src 'self' 'unsafe-inline' https://accounts.google.com",
+      "img-src 'self' data: blob: http: https:",
+      "font-src 'self' data:",
+      "connect-src 'self' http: https: ws: wss:",
+      "frame-src 'self' https://accounts.google.com",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join('; ');
+    common.push({ key: 'Content-Security-Policy-Report-Only', value: cspReportOnly });
     const noFrame = [
       { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
       { key: 'X-Frame-Options', value: 'DENY' },

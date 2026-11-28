@@ -1,4 +1,5 @@
 const Cart = require("../models/Cart");
+const { MAX_CART_ITEMS } = require("../models/shared/cartItemSchema");
 
 // ==========================================
 // GET CART (logged-in user)
@@ -8,7 +9,7 @@ const getCart = async (req, res) => {
     const cart = await Cart.findOne({ user_id: req.user._id || req.user.id });
     res.json({ success: true, data: cart?.items || [] });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "cartController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -17,7 +18,8 @@ const getCart = async (req, res) => {
 // ==========================================
 const saveCart = async (req, res) => {
   try {
-    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    // ✅ Max 50 items (typed schema cap) — findOneAndUpdate me validators nahi chalte, isliye yahan slice
+    const items = Array.isArray(req.body?.items) ? req.body.items.slice(0, MAX_CART_ITEMS) : [];
     const userId = req.user._id || req.user.id;
 
     const cart = await Cart.findOneAndUpdate(
@@ -28,7 +30,7 @@ const saveCart = async (req, res) => {
 
     res.json({ success: true, data: cart.items });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "cartController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 

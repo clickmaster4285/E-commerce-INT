@@ -4,6 +4,7 @@ const { getIO } = require("../utils/socket");
 const { pushGlobalActivity } = require("../utils/activityHelper");
 const { queueTranslationSync, hashText } = require("../utils/translationService");
 const log = require("../utils/logger");
+const { pullAttributeFromCategories } = require("../services/referentialCleanup");
 const { escapeRegex } = require("../utils/escapeRegex");
 
 const emitSocket = (event, data) => {
@@ -163,7 +164,7 @@ const getAttributeById = async (req, res) => {
     res.status(200).json({ success: true, data: attribute });
   } catch (error) {
     log.error("Error in getAttributeById:", error);
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "attributeController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -270,7 +271,7 @@ const getAttributes = async (req, res) => {
     });
   } catch (error) {
     log.error("Error in getAttributes:", error);
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "attributeController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -289,7 +290,7 @@ const getAttributeStats = async (req, res) => {
     return res.status(200).json({ success: true, stats: { total, active, withOptions, dataTypes: dataTypes.size } });
   } catch (error) {
     log.error("Error in getAttributeStats:", error);
-    return res.status(500).json({ success: false, message: error.message });
+    return (require("../utils/logger").error({ err: error }, "attributeController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -372,7 +373,7 @@ const createAttribute = async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({ success: false, message: "Attribute code already exists" });
     }
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "attributeController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -403,7 +404,7 @@ const updateAttribute = async (req, res) => {
     emitSocket("attributeUpdated", attribute.toObject());
     res.status(200).json({ success: true, data: attribute });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "attributeController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -452,7 +453,7 @@ const getAttributeCategories = async (req, res) => {
     res.status(200).json({ success: true, data: result });
   } catch (error) {
     log.error("Error in getAttributeCategories:", error);
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "attributeController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -537,7 +538,7 @@ const updateAttributeCategories = async (req, res) => {
     });
   } catch (error) {
     log.error("Error in updateAttributeCategories:", error);
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "attributeController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 
@@ -551,11 +552,13 @@ const deleteAttribute = async (req, res) => {
     if (!attribute) {
       return res.status(404).json({ success: false, message: "Attribute not found" });
     }
+    // ✅ Category.attributes me dangling ref na rahe (§3.7)
+    await pullAttributeFromCategories(attribute._id);
     emitSocket("attributeDeleted", attribute.toObject());
     res.status(200).json({ success: true, message: "Attribute deleted successfully" });
   } catch (error) {
     log.error("Error in deleteAttribute:", error);
-    res.status(500).json({ success: false, message: error.message });
+    (require("../utils/logger").error({ err: error }, "attributeController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." }));
   }
 };
 

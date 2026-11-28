@@ -15,6 +15,7 @@ import { categoryApi } from "@/apis/user/categoryApi";
 import { brandApi } from "@/apis/user/brandApi";
 import { dealApi } from "@/apis/user/dealApi";
 import { productApi } from "@/apis/user/productApi";
+import { queryKeys } from "@/lib/queryKeys";
 import {
   EMPTY_HOME_FILTERS,
   hasActiveFilters,
@@ -56,13 +57,13 @@ export function filtersToFacetParams(filters, extra = {}) {
 export function useHomeCatalog(initialFilters = {}, opts = {}) {
   const search = String(opts?.search || "").trim();
   const { data: categories = [], isPending: categoriesPending } = useQuery({
-    queryKey: ["categories"],
+    queryKey: queryKeys.categories.all,
     queryFn: categoryApi.getAll,
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: brands = [], isPending: brandsPending } = useQuery({
-    queryKey: ["brands"],
+    queryKey: queryKeys.brands.all,
     queryFn: brandApi.getAll,
     staleTime: 5 * 60 * 1000,
   });
@@ -71,7 +72,7 @@ export function useHomeCatalog(initialFilters = {}, opts = {}) {
 
   // ✅ Active deals (sidebar "Deals" filter + counts merge).
   const { data: deals = [], isPending: dealsPending } = useQuery({
-    queryKey: ["activeDeals"],
+    queryKey: queryKeys.deals.active,
     queryFn: dealApi.getActive,
     staleTime: 60 * 1000,
   });
@@ -106,7 +107,7 @@ export function useHomeCatalog(initialFilters = {}, opts = {}) {
     isError: facetsError,
     refetch: refetchFacets,
   } = useQuery({
-    queryKey: isPristineFacets ? ["shopFacets", "global"] : ["shopFacets", facetParams],
+    queryKey: isPristineFacets ? queryKeys.categories.facets() : queryKeys.categories.facets(facetParams),
     queryFn: () => productApi.getFacets(facetParams),
     staleTime: 60 * 1000,
     retry: 1,

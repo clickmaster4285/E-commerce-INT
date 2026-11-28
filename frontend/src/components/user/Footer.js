@@ -21,7 +21,7 @@ import {
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
 import { useStoreTheme } from "@/storefront/ThemeProvider";
-import { resolveThemeLink, isExternalHref } from "@/storefront/themeLinks";
+import { resolveThemeLink, isExternalHref, safeUrl } from "@/storefront/themeLinks";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -181,7 +181,7 @@ export default function Footer() {
   const phoneHref = `tel:${(supportPhone || "").replace(/[^0-9+]/g, "")}`;
 
   const activeSocials = Object.entries(SOCIAL_ICONS)
-    .map(([key, cfg]) => ({ key, ...cfg, url: store?.social_links?.[key] || "" }))
+    .map(([key, cfg]) => ({ key, ...cfg, url: safeUrl(store?.social_links?.[key], { allowMailto: false }) || "" }))
     .filter((s) => s.url);
 
   const socialsToRender =

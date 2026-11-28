@@ -5,6 +5,7 @@ const { getIO } = require("../utils/socket");
 const { emitSocketEvent } = require("../utils/emitSocketEvent");
 const { escapeRegex } = require("../utils/escapeRegex");
 const log = require("../utils/logger");
+const { countProductsUsingBrand } = require("../services/referentialCleanup");
 const { withoutProtected } = require("../utils/sanitizeBody"); // mass assignment guard
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 const { queueTranslationSync } = require("../utils/translationService");
@@ -337,6 +338,14 @@ const deleteBrand = async (req, res) => {
       return res.status(404).json({ success: false, message: "Brand not found or already deleted" });
     }
 
+    // ✅ Products abhi is brand ko use kar rahe hon to delete block (§3.7)
+    const inUse = await countProductsUsingBrand(brand._id);
+    if (inUse > 0) {
+      return res.status(409).json({
+        success: false,
+        message: `Brand is used by ${inUse} product(s). Reassign them first.`,
+      });
+    }
 
     await brand.softDelete(req.user._id);
 

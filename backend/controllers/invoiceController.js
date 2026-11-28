@@ -265,13 +265,13 @@ exports.listInvoices = async (req, res) => {
       stats: { total, paid, unpaid, overdue },
       pagination: { total: filteredTotal, page, limit, pages, hasNext: page < pages, hasPrev: page > 1 },
     });
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+  } catch (error) { (require("../utils/logger").error({ err: error }, "invoiceController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." })); }
 };
 
 exports.getNextInvoiceNumber = async (_req, res) => {
   try {
     res.json({ success: true, data: { invoice_number: await previewInvoiceNumber() } });
-  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+  } catch (error) { (require("../utils/logger").error({ err: error }, "invoiceController failed"), res.status(500).json({ success: false, message: "Something went wrong. Please try again." })); }
 };
 
 exports.getInvoice = async (req, res) => {

@@ -8,6 +8,7 @@ import axiosInstance from '@/apis/axiosInstance';
 import { getStoreAdminUrl, isPlatformHost } from '@/apis/storeHandoff';
 import { storeApi } from '@/apis/admin/storeApi';
 import { toast } from 'sonner';
+import { toUserMessage } from '@/lib/toUserMessage';
 import { useTranslation } from '@/i18n/LanguageProvider';
 import AdminLanguageSwitcher from '@/components/adminComponents/AdminLanguageSwitcher';
 import LazyGoogleLogin from '@/components/user/LazyGoogleLogin';
@@ -212,7 +213,7 @@ export default function AdminLoginPage() {
         toast.error(t('admin.login.serverUnavailable'));
         return;
       }
-      toast.error(err.response?.data?.message || t('auth.login.googleFailed'));
+      toast.error(toUserMessage(err, t('auth.login.googleFailed')));
     },
   });
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;

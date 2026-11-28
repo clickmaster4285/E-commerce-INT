@@ -5,6 +5,7 @@ const mongoose = require("mongoose");
 const log = require("../utils/logger");
 const { escapeRegex } = require("../utils/escapeRegex");
 const { hydrate } = require("../utils/hydrate");
+const { pullTagFromProducts } = require("../services/referentialCleanup");
 
 // Helper to resolve user/employee info (single id — create/update responses ke liye)
 const resolveCreator = async (userId) => {
@@ -203,6 +204,9 @@ const deleteTag = async (req, res) => {
     if (!deletedTag) {
       return res.status(404).json({ message: "Tag not found" });
     }
+
+    // ✅ Product/Variant tag_ids se dangling ref hatao (§3.7)
+    await pullTagFromProducts(deletedTag._id);
 
     return res.status(200).json({ message: "Tag deleted successfully" });
   } catch (error) {

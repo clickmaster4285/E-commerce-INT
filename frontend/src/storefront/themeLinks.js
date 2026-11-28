@@ -8,6 +8,19 @@
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+// Raw string URL (banner button.link, footer social url) — sirf same-site path,
+// http(s) ya mailto/tel. javascript:, data:, vbscript:, "//host" sab block.
+// Control chars/whitespace hata kar check hota hai ("java\nscript:" trick).
+export function safeUrl(value, { allowMailto = true } = {}) {
+  const url = String(value || "").trim();
+  if (!url) return null;
+  const compact = url.replace(/[\u0000-\u0020\u007f-\u009f]/g, "");
+  if (/^\/(?![/\\])/.test(compact) || compact === "#") return url;
+  if (/^https?:\/\/[^/\s]+/i.test(compact)) return url;
+  if (allowMailto && /^(mailto|tel):/i.test(compact)) return url;
+  return null;
+}
+
 export function resolveThemeLink(link) {
   if (!link || typeof link !== "object") return null;
   const ref = String(link.ref || "");

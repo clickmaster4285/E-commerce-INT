@@ -3,6 +3,7 @@
 import FallbackImage from "@/components/common/FallbackImage";
 import { useState, useMemo, useRef } from "react";
 import Link from "next/link";
+import { safeUrl } from "@/storefront/themeLinks";
 
 import { smartImageLoader } from "@/utils/smartImageLoader";
 import { useQuery } from "@tanstack/react-query";
@@ -479,7 +480,7 @@ function ImageSlide({ banner, imgUrl, mountImage, isActive, priority, fallbackAl
 
 function ButtonLink({ button, palette, primary = false, isActive, delay = 0, locale }) {
   const { t } = useTranslation();
-  const href = button.link || "#";
+  const href = safeUrl(button.link) || "#";
 
   // Inline color: `.user-theme a { color: inherit }` Tailwind text-* ko override kar deta hai
   return (

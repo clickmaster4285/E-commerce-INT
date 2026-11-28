@@ -1,4 +1,5 @@
 import { userHttp } from "../axiosInstance";
+import { toUserMessage } from "@/lib/toUserMessage";
 // ==========================================
 // 🔐 AUTH / OTP API
 // ==========================================
@@ -31,7 +32,7 @@ export const authApi = {
 
 // ✅ Backend ke friendly error message nikaalne ke liye
 export const getApiErrorMessage = (err, fallback = "Something went wrong. Please try again.") =>
-  err?.response?.data?.message || err?.response?.data?.error || err?.message || fallback;
+  toUserMessage(err, err?.response?.data?.error || fallback);
 
 // ✅ Resend button ke cooldown ke liye (backend 429 + retryAfter bhejta hai)
 export const getApiRetryAfter = (err) => {

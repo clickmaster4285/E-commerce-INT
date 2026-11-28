@@ -3,6 +3,7 @@
 
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/queryKeys";
 import { getAdminSocket as getSocket } from "./useAdminSocket"; // Apne global socket helper ko import karein
 
 export default function useDealSocketSync() {
@@ -28,11 +29,11 @@ export default function useDealSocketSync() {
     // DEALS LIST REFRESH HELPER
     // -------------------------------------------------------
     const invalidateDeals = () => {
-      queryClient.invalidateQueries({ queryKey: ["deals"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.deals.all });
       // ✅ Mirror to the deals key the user GUI's DiscountContext reads,
       // so admin deal changes refresh the homepage deals strip + product page
       // deal-mode pricing immediately.
-      queryClient.invalidateQueries({ queryKey: ["activeDeals"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.deals.active });
       // Agar stats alag query hain to unhein bhi refresh karein
       // queryClient.invalidateQueries({ queryKey: ["deal-stats"] });
     };
@@ -61,7 +62,7 @@ export default function useDealSocketSync() {
       invalidateDeals();
 
       if (dealKey) {
-        queryClient.invalidateQueries({ queryKey: ["deal", dealKey] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.deals.detail(dealKey) });
       } else {
         queryClient.invalidateQueries({ queryKey: ["deal"] });
       }
@@ -78,7 +79,7 @@ export default function useDealSocketSync() {
       
       if (id) {
         // Cache se remove karein
-        queryClient.removeQueries({ queryKey: ["deal", String(id)] });
+        queryClient.removeQueries({ queryKey: queryKeys.deals.detail(id) });
       }
       
       if (selfActionRef.current === "delete") {

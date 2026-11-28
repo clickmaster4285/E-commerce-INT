@@ -12,13 +12,9 @@
 //   5. multer / validation errors → AppError (errorHandler JSON deta hai)
 //   6. controller fail ho (non-2xx) to likhi hui files delete (orphan nahi)
 //
-// TODO (abhi purane multer/sharp wale, factory par migrate hone baaki):
-//   - middleware/productImageMiddleware.js + saveProductImages.js
-//   - middleware/bundleImageMiddleware.js
-//   - middleware/themeImageMiddleware.js
-//   - middleware/reviewUploadMiddleware.js
-//   - middleware/imageMiddleware.js (brand logo; contain-fit + brandId folder)
-//   - utils/socket.js store logo base64 (REST multipart par shift karna hai)
+// Factory par migrate ho chuke: deal, banner, store logo, product (+variant), bundle, theme,
+// review (images + video), brand logo. Socket store logo base64 ab deprecated thin wrapper hai
+// (utils/socket.js → processImage); REST: PUT /store ya POST /store/logo (multipart).
 // ==========================================================
 
 const fs = require("fs");
@@ -32,7 +28,7 @@ const { uploadDirFor, uploadUrlFor } = require("../utils/uploadPaths");
 
 // Sirf raster images — SVG me <script> chal sakta hai (stored XSS)
 const IMAGE_MIMES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"]);
-const VIDEO_MIMES = new Set(["video/mp4", "video/webm"]);
+const VIDEO_MIMES = new Set(["video/mp4", "video/webm", "video/quicktime"]); // mov ka sniff bhi "ftyp" (mp4 jaisa)
 
 const DEFAULT_MAX_MB = Number.parseInt(process.env.MAX_UPLOAD_SIZE_MB, 10) || 10;
 const DEFAULT_MAX_PIXELS = 50_000_000; // decompression-bomb guard
@@ -188,6 +184,7 @@ function createImageUpload(cfg = {}) {
     return {
       img_url: url, img_size: out.size, mimeType: out.mimeType, width: out.width, height: out.height,
       // multer-compatible fields — purane controllers req.file.path / filename use karte hain
+      originalSize: file.size, // upload ke waqt (sharp se pehle) — per-file limit checks ke liye
       fieldname: file.fieldname, originalname: file.originalname, path: filePath,
       filename: path.basename(filePath), mimetype: out.mimeType, size: out.size,
     };

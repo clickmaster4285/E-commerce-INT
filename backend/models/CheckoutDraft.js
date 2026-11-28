@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const tenantScope = require("../utils/tenantScopePlugin");
+const { cartItemSchema, maxItemsValidator } = require("./shared/cartItemSchema");
 
 const checkoutDraftSchema = new mongoose.Schema(
   {
@@ -18,7 +19,7 @@ const checkoutDraftSchema = new mongoose.Schema(
         paymentMethod: { type: String, default: "cod" },
         saved: { type: Boolean, default: false },
         status: { type: String, enum: ["active", "completed"], default: "active", index: true },
-        items: { type: mongoose.Schema.Types.Mixed, default: [] },
+        items: { type: [cartItemSchema], default: [], validate: maxItemsValidator },
         subtotal: { type: Number },
         shipping: { type: Number },
         tax: { type: Number },

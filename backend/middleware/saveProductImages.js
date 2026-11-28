@@ -1,8 +1,8 @@
-const path = require("path");
-const fs = require("fs-extra");
 const mongoose = require("mongoose");
-const { uploadDirFor, uploadUrlFor } = require("../utils/uploadPaths");
 
+// Product images ab productImagesUpload (createImageUpload factory) me hi disk par save ho
+// chuki hoti hain — yahan sirf controller ke liye req.savedImages banta hai.
+// (Controller fail ho to factory ka cleanup files hata deta hai.)
 const saveProductImages = async (req, res, next) => {
   try {
     // Agar image nahi hai to skip
@@ -10,54 +10,16 @@ const saveProductImages = async (req, res, next) => {
       return next();
     }
 
-    // Update ke case mein params id,
-    // Create ke case mein nayi product id
-   const productId =
-  req.productId ||
-  req.params.id ||
-  new mongoose.Types.ObjectId();
-    // Controller bhi isi ID ko use karega
-    req.productId = productId;
+    // Update ke case mein params id, Create ke case mein nayi product id (factory set kar chuka hota hai)
+    req.productId = req.productId || req.params.id || new mongoose.Types.ObjectId();
 
-    // Store ka apna folder: uploads/stores/<storeId>/products/<productId>
-    const uploadDirectory = uploadDirFor(req, "products", productId.toString());
-
-    // Folder create karo agar exist nahi karta
-    await fs.ensureDir(uploadDirectory);
-
-    const savedImages = [];
-
-    for (let i = 0; i < req.files.length; i++) {
-      const file = req.files[i];
-      const metadata = req.imageMetadata[i];
-
-      const extension = path.extname(file.originalname).toLowerCase();
-
-      const originalName = path
-        .basename(file.originalname, extension)
-        .replace(/[^a-zA-Z0-9-_]/g, "-");
-
-      const fileName = `${Date.now()}-${i}-${originalName}${extension}`;
-
-      const filePath = path.join(
-        uploadDirectory,
-        fileName
-      );
-
-      // Image physically save
-      await fs.writeFile(filePath, file.buffer);
-
-      savedImages.push({
-        img_url: uploadUrlFor(filePath),
-        img_size: file.size,
-        mimeType: file.mimetype,
-        width: metadata.width,
-        height: metadata.height,
-      });
-    }
-
-    // Controller mein use hoga
-    req.savedImages = savedImages;
+    req.savedImages = req.files.map((file) => ({
+      img_url: file.img_url,
+      img_size: file.img_size,
+      mimeType: file.mimeType,
+      width: file.width,
+      height: file.height,
+    }));
 
     next();
   } catch (error) {
@@ -68,3 +30,4 @@ const saveProductImages = async (req, res, next) => {
 };
 
 module.exports = saveProductImages;
+
