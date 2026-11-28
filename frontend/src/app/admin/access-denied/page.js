@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import { ShieldX, Mail, Lock, AlertTriangle, LogOut } from 'lucide-react';
 import adminHttp from '@/apis/axiosInstance';
@@ -10,26 +10,11 @@ import { useTranslation } from '@/i18n/LanguageProvider';
 export default function AccessDeniedPage() {
   const { t } = useTranslation();
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const [countdown, setCountdown] = useState(20);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (countdown <= 0) {
-      handleLogout();
-      return;
-    }
-    const timer = setInterval(() => {
-      setCountdown((prev) => prev - 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [countdown]);
-
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     setIsLoggingOut(true);
     try {
       await adminHttp.post('/users/logout');
@@ -43,7 +28,18 @@ export default function AccessDeniedPage() {
     setTimeout(() => {
       router.replace('/login');
     }, 800);
-  };
+  }, [t, router]);
+
+  useEffect(() => {
+    if (countdown <= 0) {
+      queueMicrotask(handleLogout);
+      return;
+    }
+    const timer = setInterval(() => {
+      setCountdown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [countdown, handleLogout]);
 
   return (
     <div

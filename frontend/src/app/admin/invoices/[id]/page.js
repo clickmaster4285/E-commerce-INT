@@ -109,7 +109,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
 
   useEffect(() => {
     if (!invoice?.sent_at || searchParams.get("returnRefund") !== "1") return;
-    setReturnOpen(true);
+    queueMicrotask(() => setReturnOpen(true));
     router.replace(`/admin/invoices/${id}`, { scroll: false });
   }, [invoice, id, router, searchParams, t]);
 

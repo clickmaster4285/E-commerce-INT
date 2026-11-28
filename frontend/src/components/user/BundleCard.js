@@ -84,7 +84,7 @@ export default function BundleCard({ bundle, className = "" }) {
     enabled: bundleProductIds.length > 0,
     staleTime: 60 * 1000,
   });
-  const products = bundleProductsData?.products || [];
+  const products = useMemo(() => bundleProductsData?.products || [], [bundleProductsData]);
 
   const items = useMemo(
     () => resolveBundleItems(bundle, products),

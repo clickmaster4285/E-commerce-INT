@@ -61,7 +61,11 @@ function DepartmentDropdown({ value, onChange, disabled }) {
   const inputRef = useRef(null);
 
   // Sync external value changes
-  useEffect(() => { if (value !== undefined) setInputValue(value || ""); }, [value]);
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
+    if (value !== undefined) setInputValue(value || "");
+  }
 
   // Close on click outside
   useEffect(() => {
@@ -518,9 +522,8 @@ export default function EmployeesPage() {
   const paginatedEmployees = employees; 
   const totalPages = pagination.pages || 1;
 
-  useEffect(() => {
-    if (currentPage > totalPages) setCurrentPage(totalPages);
-  }, [currentPage, totalPages]);
+  // Page clamp (render ke dauran adjust)
+  if (currentPage > totalPages) setCurrentPage(totalPages);
 
   useEffect(() => {
     if (!actionMenu) return;

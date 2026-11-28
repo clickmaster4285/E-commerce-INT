@@ -133,31 +133,23 @@ function DepartmentDropdown({ value, onChange, disabled }) {
   const [inputValue, setInputValue] = useState(value || "");
   const [isOpen, setIsOpen] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
-  const [filteredOptions, setFilteredOptions] = useState(
-    PREDEFINED_DEPARTMENTS
-  );
-
   const containerRef = useRef(null);
   const inputRef = useRef(null);
 
-  useEffect(() => {
-    if (value !== undefined) {
-      setInputValue(value || "");
-    }
-  }, [value]);
+  // External value change sync (render ke dauran adjust)
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
+    if (value !== undefined) setInputValue(value || "");
+  }
 
-  useEffect(() => {
-    if (!inputValue.trim()) {
-      setFilteredOptions(PREDEFINED_DEPARTMENTS);
-    } else {
-      setFilteredOptions(
-        PREDEFINED_DEPARTMENTS.filter((d) =>
-          d.toLowerCase().includes(inputValue.toLowerCase()) ||
-          employeeDepartmentLabel(d, t).toLowerCase().includes(inputValue.toLowerCase())
-        )
+  // Derive: filtered options input se nikalte hain
+  const filteredOptions = !inputValue.trim()
+    ? PREDEFINED_DEPARTMENTS
+    : PREDEFINED_DEPARTMENTS.filter((d) =>
+        d.toLowerCase().includes(inputValue.toLowerCase()) ||
+        employeeDepartmentLabel(d, t).toLowerCase().includes(inputValue.toLowerCase())
       );
-    }
-  }, [inputValue, t]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -334,9 +326,11 @@ function EmployeeOverview({
     setShowPermissionsModal(true);
   };
 
+  // Date.now() render me impure hai — mount par ek baar capture
+  const [renderedAt] = useState(() => Date.now());
   const relativeTime = (ts) => {
     if (!ts) return "";
-    const minutes = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+    const minutes = Math.floor((renderedAt - new Date(ts).getTime()) / 60000);
     if (minutes < 1) return t("admin.employees.detail.justNow");
     if (minutes < 60) return t("admin.employees.detail.minutesAgo", { mins: minutes });
     if (minutes < 1440) return t("admin.employees.detail.hoursAgo", { hours: Math.floor(minutes / 60) });

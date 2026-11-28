@@ -38,6 +38,7 @@ const redirectToLogin = () => {
   if (typeof window === "undefined") return;
   const path = window.location.pathname;
   if (path === "/super-admin/login" || path.startsWith("/super-admin/login/")) return;
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- hard redirect: full reload se auth state/cookies reset
   window.location.href = "/super-admin/login";
 };
 

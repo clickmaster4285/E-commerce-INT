@@ -318,8 +318,9 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
 
   const selectedItemsDetails = useMemo(() => {
     if (!sel) return [];
-    return sel.items.filter((item) => ids.includes(getId(item)));
-  }, [sel, ids, sel?.items]);
+    const selIds = formData[sel.key] || [];
+    return sel.items.filter((item) => selIds.includes(getId(item)));
+  }, [sel, formData]);
 
   const totalSelectedValue = useMemo(() => {
     if (formType !== 'product') return 0;
@@ -352,7 +353,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
     }
     options.push({ value: "free_shipping", label: t("admin.promotions.ui.generated.36abd54d7de4") });
     return options;
-  }, [formType, formData.value_type]);
+  }, [formType, formData.value_type, t]);
 
   // Bundle deal: no fixed bundle price — savings come from the single offer rule only
   const bundleSavings = 0;

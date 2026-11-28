@@ -77,7 +77,7 @@ function useInViewport(ref) {
     const el = ref?.current;
     if (!el) return;
     if (typeof IntersectionObserver === "undefined") {
-      setVisible(true);
+      queueMicrotask(() => setVisible(true));
       return;
     }
     const io = new IntersectionObserver(
@@ -98,7 +98,7 @@ function useCountdown(endDate, active = true) {
   useEffect(() => {
     if (!active) return;
     // Foran sync (invisible period ka gap na dikhe), phir 1s tick
-    setTime(calcTime(endDate));
+    queueMicrotask(() => setTime(calcTime(endDate)));
     const t = setInterval(() => setTime(calcTime(endDate)), 1000);
     return () => clearInterval(t);
   }, [endDate, active]);

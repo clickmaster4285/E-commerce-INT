@@ -120,6 +120,7 @@ function createAuthHttp({ refreshUrl, publicAuthPaths, mode, guestBlockedPaths =
     const path = window.location.pathname;
     if (["/login", "/register", "/admin/login"].includes(path)) return;
     if (path.startsWith("/admin")) {
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- hard redirect: full reload se auth state/cookies reset
       window.location.href = "/admin/login";
     }
   };

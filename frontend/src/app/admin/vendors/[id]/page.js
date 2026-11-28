@@ -1,5 +1,5 @@
 "use client";
-import { use, useMemo, useState } from "react";
+import { use, useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -80,9 +80,9 @@ export default function VendorDetailPage({ params }) {
   const qc = useQueryClient();
   const { t: __t, locale } = useTranslation();
   const t = (k, p) => __t("admin.vendors." + k, p);
-  const tDetail = (k, p) => __t("admin.vendors.detail." + k, p);
+  const tDetail = useCallback((k, p) => __t("admin.vendors.detail." + k, p), [__t]);
   const tToast = (k, p) => __t("admin.vendors.toast." + k, p);
-  const tShared = (k, p) => __t("admin.shared." + k, p);
+  const tShared = useCallback((k, p) => __t("admin.shared." + k, p), [__t]);
   
   const STATUS_LABEL = getStatusLabels(tDetail);
   

@@ -365,8 +365,9 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
 
   const selectedItemsDetails = useMemo(() => {
     if (!sel) return [];
-    return sel.items.filter((item) => ids.includes(getId(item)));
-  }, [sel, ids, sel?.items]);
+    const selIds = formData[sel.key] || [];
+    return sel.items.filter((item) => selIds.includes(getId(item)));
+  }, [sel, formData]);
 
   const totalSelectedValue = useMemo(() => {
     if (formType !== 'product') return 0;
@@ -814,7 +815,7 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
     const term = search.toLowerCase().trim();
     if (!term) return items;
     return items.filter((item) => getName(item, type, locale, t).toLowerCase().includes(term));
-  }, [items, search, type, locale]);
+  }, [items, search, type, locale, t]);
 
   const title = type === "product" ? t("common.product") + "s" : type === "category" ? t("common.category") + "s" : t("common.brand") + "s";
   const TypeIcon = type === "product" ? BoxIcon : type === "category" ? FolderIcon : AwardIcon;
@@ -1128,7 +1129,7 @@ function ProductDetailsModal({ product, onClose }) {
       .filter((a) => a && a.name && a.is_active !== false && !have.has(String(a.name).toLowerCase()))
       .map((a) => ({ name: a.name, value: t("admin.discounts.detail.notSet") }));
     return [...base, ...assigned];
-  }, [product, categoryAttributes]);
+  }, [product, categoryAttributes, t]);
 
   return (
     <div

@@ -144,10 +144,13 @@ function NewPOPage() {
     if (prefilled) return;
     const pre = searchParams.get("vendor");
     if (pre && vendorId === "" && vendorList.some((v) => v._id === pre)) {
-      setVendorId(pre);
-      pushEvent(t("admin.purchaseOrders.create.event.vendorPreselected"));
-      setPrefilled(true);
+      queueMicrotask(() => {
+        setVendorId(pre);
+        pushEvent(t("admin.purchaseOrders.create.event.vendorPreselected"));
+        setPrefilled(true);
+      });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- i18n t identity; pushEvent sirf prefill par
   }, [searchParams, vendorList, vendorId, prefilled]);
 
   useEffect(() => {
@@ -164,6 +167,7 @@ function NewPOPage() {
   useEffect(() => {
     if (!editId || !editPO || !vendorsRaw || !stockAll || editPrefilledId === editId) return;
     const stockByVariant = new Map(stockAll.map((variant) => [String(variant._id), variant]));
+    queueMicrotask(() => {
     setVendorId(String(editPO.vendor_id?._id || editPO.vendor_id || ""));
     setExpectedDate(editPO.expected_date ? String(editPO.expected_date).slice(0, 10) : "");
     setShipping(Number(editPO.shipping) || 0);
@@ -189,6 +193,7 @@ function NewPOPage() {
       };
     }));
     setEditPrefilledId(editId);
+    });
   }, [editId, editPO, vendorsRaw, stockAll, editPrefilledId]);
   const categories = useMemo(() => {
     const m = new Map();

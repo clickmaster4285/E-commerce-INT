@@ -2,7 +2,7 @@
 import FallbackImage from "@/components/common/FallbackImage";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useProductSocketSync } from "../../../../hooks/admin/useProductSocketSync";
 import { useAdminSocket } from "@/hooks/admin/useAdminSocket";
@@ -933,9 +933,20 @@ function ImageGalleryModal({ images, initialIndex, onClose }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex || 0);
   
   // Reset index when images change
-  useEffect(() => {
+  const [prevGallery, setPrevGallery] = useState({ initialIndex, images });
+  if (prevGallery.initialIndex !== initialIndex || prevGallery.images !== images) {
+    setPrevGallery({ initialIndex, images });
     setCurrentIndex(initialIndex || 0);
-  }, [initialIndex, images]);
+  }
+
+  const imagesLength = images?.length || 0;
+  const nextImage = useCallback(() => {
+    setCurrentIndex((prev) => (prev + 1) % imagesLength);
+  }, [imagesLength]);
+
+  const prevImage = useCallback(() => {
+    setCurrentIndex((prev) => (prev - 1 + imagesLength) % imagesLength);
+  }, [imagesLength]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -946,15 +957,7 @@ function ImageGalleryModal({ images, initialIndex, onClose }) {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentIndex, images.length]);
-
-  const nextImage = () => {
-    setCurrentIndex((prev) => (prev + 1) % images.length);
-  };
-
-  const prevImage = () => {
-    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
-  };
+  }, [onClose, nextImage, prevImage]);
 
   if (!images || images.length === 0) return null;
 
@@ -1080,13 +1083,16 @@ export default function ProductDetailPage() {
   const [variantPage, setVariantPage] = useState(1);
   const [variantPageSize] = useState(10);
 
-  useEffect(() => {
+  // URL ?tab= change par hi sync (render ke dauran adjust; manual tab change revert nahi hota)
+  const [prevSearchParams, setPrevSearchParams] = useState(searchParams);
+  if (searchParams !== prevSearchParams) {
+    setPrevSearchParams(searchParams);
     const tabParam = searchParams?.get("tab");
     const validTabs = ["overview", "variants", "tags", "category", "brand", "activity"];
     if (validTabs.includes(tabParam) && tabParam !== activeTab) {
       setActiveTab(tabParam);
     }
-  }, [searchParams]);
+  }
 
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -1223,6 +1229,7 @@ export default function ProductDetailPage() {
   // healed docs (with Created By) must appear in this page's tag lookups.
   useEffect(() => {
     if (product && refetchTags) refetchTags();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sirf product id change par refetch
   }, [product?._id]);
 
   // Mutations

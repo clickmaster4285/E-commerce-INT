@@ -78,8 +78,14 @@ const BrandCountryDropdown = ({ value, onChange, disabled = false, allCountries 
 
   useEffect(() => {
     if (isOpen && searchInputRef.current) setTimeout(() => searchInputRef.current?.focus(), 50);
-    if (!isOpen) setSearchTerm("");
   }, [isOpen]);
+
+  // Band hone par search reset (render ke dauran adjust)
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (prevIsOpen !== isOpen) {
+    setPrevIsOpen(isOpen);
+    if (!isOpen) setSearchTerm("");
+  }
 
   const handleSelect = (countryName) => {
     onChange(countryName);
@@ -190,8 +196,11 @@ export default function ProductFormModal({ open, initialProduct = null, onClose,
   const { data: categories = [] } = useQuery({ queryKey: ["category-options"], queryFn: () => categoryApi.getOptions(), retry: false, enabled: open });
   const { data: brands = [] } = useQuery({ queryKey: ["brand-options"], queryFn: () => brandApi.getOptions(), retry: false, enabled: open });
 
-  useEffect(() => {
-    if (!open) return;
+  // open/initialProduct badalne par form seed (render ke dauran adjust)
+  const [prevSeed, setPrevSeed] = useState({ open: undefined, initialProduct: undefined });
+  if (prevSeed.open !== open || prevSeed.initialProduct !== initialProduct) {
+    setPrevSeed({ open, initialProduct });
+    if (open) {
     if (initialProduct) {
       const currentTagNames = (initialProduct.tag_ids || []).map((t) => (typeof t === "object" ? t.name : t)).filter(Boolean);
       const isPerishable = initialProduct?.isPerishable === true;
@@ -208,7 +217,8 @@ export default function ProductFormModal({ open, initialProduct = null, onClose,
     }
     setIsCategoryDropdownOpen(false);
     setIsBrandDropdownOpen(false);
-  }, [open, initialProduct]);
+    }
+  }
 
   const filteredCategoryOptions = useMemo(() => {
     const term = categoryDropdownSearch.trim().toLowerCase();

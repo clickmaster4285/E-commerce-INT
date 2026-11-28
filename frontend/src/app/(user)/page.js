@@ -69,13 +69,15 @@ function HeroPreload({ banners }) {
     if (!base) return null;
     src = `${base}${src.startsWith("/") ? "" : "/"}${src}`;
   }
+  let isFastCdn = false;
   try {
     const host = new URL(src, "http://localhost").hostname;
-    if (FAST_CDN_PRELOAD.test(host)) {
-      return <link rel="preload" as="image" href={src} fetchPriority="high" />;
-    }
+    isFastCdn = FAST_CDN_PRELOAD.test(host);
   } catch {
     // neeche optimizer path
+  }
+  if (isFastCdn) {
+    return <link rel="preload" as="image" href={src} fetchPriority="high" />;
   }
   const enc = encodeURIComponent(src);
   const srcSet = [640, 1080, 1920]

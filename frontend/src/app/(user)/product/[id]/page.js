@@ -133,7 +133,10 @@ function useRelatedProducts(product, categoryId) {
 }
 
 function useVariant(variants = []) {
-  const safeVariants = variants.length ? variants : [{ _id: "default", images: [] }];
+  const safeVariants = useMemo(
+    () => (variants.length ? variants : [{ _id: "default", images: [] }]),
+    [variants]
+  );
   const [index, setIndex] = useState(0);
   const [imgIndex, setImgIndex] = useState(0);
   const current = safeVariants[index] || safeVariants[0];
@@ -722,31 +725,34 @@ function ProductDetailContent({ params }) {
   const sourceParam = searchParams.get("source");
   const cameFromDeal = sourceParam === "deal" || !!dealParam;
 
-  const [selectedDealId, setSelectedDealId] = useState(() => {
+  const [selectedDealIdRaw, setSelectedDealId] = useState(() => {
     if (dealParam && allDeals.some((d) => String(d._id) === String(dealParam))) return dealParam;
     return allDeals[0]?._id || null;
   });
 
-  useEffect(() => {
-    const stillValid = allDeals.some((d) => String(d._id) === String(selectedDealId));
-    if (stillValid) return;
+  // Derive: agar selected deal ab valid nahi to param/first deal par fallback
+  const selectedDealId = (() => {
+    if (allDeals.some((d) => String(d._id) === String(selectedDealIdRaw))) return selectedDealIdRaw;
     const fromParam = dealParam && allDeals.some((d) => String(d._id) === String(dealParam)) ? dealParam : null;
-    const next = fromParam || allDeals[0]?._id || null;
-    setSelectedDealId(next);
-  }, [allDeals, dealParam, selectedDealId]);
+    return fromParam || allDeals[0]?._id || null;
+  })();
 
   const matchedDeal = allDeals.find((d) => String(d._id) === String(selectedDealId)) || allDeals[0] || null;
 
   const [purchaseMode, setPurchaseMode] = useState(cameFromDeal && hasDeal ? "deal" : "regular");
   const [dealsOpen, setDealsOpen] = useState(false);
-  useEffect(() => {
-    if (cameFromDeal && hasDeal) setDealsOpen(true);
-  }, [cameFromDeal, hasDeal]);
+  const [dealsOpenSeen, setDealsOpenSeen] = useState(false);
+  const dealsOpenWanted = Boolean(cameFromDeal && hasDeal);
+  if (dealsOpenSeen !== dealsOpenWanted) {
+    setDealsOpenSeen(dealsOpenWanted);
+    if (dealsOpenWanted) setDealsOpen(true);
+  }
   const userSelectedModeRef = useRef(false);
   useEffect(() => {
     if (userSelectedModeRef.current) return;
-    if (cameFromDeal && hasDeal && purchaseMode !== "deal") setPurchaseMode("deal");
-    else if (purchaseMode === "deal" && !hasDeal) setPurchaseMode("regular");
+    // microtask: ref-gated sync, effect body me direct setState nahi
+    if (cameFromDeal && hasDeal && purchaseMode !== "deal") queueMicrotask(() => setPurchaseMode("deal"));
+    else if (purchaseMode === "deal" && !hasDeal) queueMicrotask(() => setPurchaseMode("regular"));
   }, [cameFromDeal, hasDeal, purchaseMode]);
 
   const regularDisc = useMemo(() => calculateProductDiscount(product, variantPrice, false), [calculateProductDiscount, product, variantPrice]);

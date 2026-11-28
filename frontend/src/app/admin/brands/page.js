@@ -157,6 +157,7 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
     if (!searchTerm.trim()) return allCountries;
     const term = searchTerm.toLowerCase();
     return allCountries.filter((c) => c.name.toLowerCase().includes(term) || localizedCountryName(c).toLowerCase().includes(term) || c.isoCode.toLowerCase().includes(term));
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- localizedCountryName locale par depend karta hai (locale dep me hai)
   }, [allCountries, searchTerm, locale]);
 
   const selectedCountry = useMemo(() => allCountries.find((c) => c.name === value) || null, [allCountries, value]);
@@ -174,8 +175,14 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
 
   useEffect(() => {
     if (isOpen && searchInputRef.current) setTimeout(() => searchInputRef.current?.focus(), 50);
-    if (!isOpen) setSearchTerm("");
   }, [isOpen]);
+
+  // Band hone par search reset (render ke dauran adjust)
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (prevIsOpen !== isOpen) {
+    setPrevIsOpen(isOpen);
+    if (!isOpen) setSearchTerm("");
+  }
 
   const handleSelect = (countryName) => {
     onChange(countryName);
@@ -251,6 +258,16 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
 };
 
 /* ================= Main Component ================= */
+const SELECT_INPUT_STYLE = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
+const SelectFilter = ({ value, onChange, children }) => (
+  <div className="relative">
+    <select value={value} onChange={onChange} className="appearance-none h-9 w-full sm:w-[140px] ps-3 pe-8 rounded-lg text-[13px] md:text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40" style={SELECT_INPUT_STYLE}>
+      {children}
+    </select>
+            <span className="absolute end-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDownIcon className="w-3.5 h-3.5" /></span>
+  </div>
+);
+
 export default function BrandsPage() {
   const { t, dir, locale } = useTranslation();
   const { nameOf, descriptionOf } = useLocalized();
@@ -632,21 +649,12 @@ export default function BrandsPage() {
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
   const inputStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
-  const SortHeader = ({ label, sortKey }) => (
+  const renderSortHeader = ({ label, sortKey }) => (
     <th className="px-4 py-3 text-start">
       <button type="button" onClick={() => handleSort(sortKey)} className="inline-flex items-center gap-1 text-[12px] font-semibold uppercase tracking-wider transition hover:opacity-80" style={{ color: sortConfig.key === sortKey ? "var(--text-primary)" : "var(--text-muted)" }}>
         {label} <SortIndicator active={sortConfig.key === sortKey} direction={sortConfig.direction} />
       </button>
     </th>
-  );
-
-  const SelectFilter = ({ value, onChange, children }) => (
-    <div className="relative">
-      <select value={value} onChange={onChange} className="appearance-none h-9 w-full sm:w-[140px] ps-3 pe-8 rounded-lg text-[13px] md:text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle}>
-        {children}
-      </select>
-              <span className="absolute end-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDownIcon className="w-3.5 h-3.5" /></span>
-    </div>
   );
 
   const ActionButtons = ({ brand }) => {
@@ -871,11 +879,11 @@ export default function BrandsPage() {
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                   <tr>
                     <th className="px-4 py-3 w-10"><input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></th>
-                    <SortHeader label={t("admin.brands.ui.brandCode")} sortKey="code" />
-                    <SortHeader label={t("admin.brands.ui.brandName")} sortKey="name" />
+                    {renderSortHeader({ label: t("admin.brands.ui.brandCode"), sortKey: "code" })}
+                    {renderSortHeader({ label: t("admin.brands.ui.brandName"), sortKey: "name" })}
                     <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>{t("admin.brands.ui.description")}</th>
-                    <SortHeader label={t("admin.brands.ui.country")} sortKey="country" />
-                    <SortHeader label={t("admin.brands.ui.status")} sortKey="status" />
+                    {renderSortHeader({ label: t("admin.brands.ui.country"), sortKey: "country" })}
+                    {renderSortHeader({ label: t("admin.brands.ui.status"), sortKey: "status" })}
                     <th className="px-4 py-3 text-end text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)", width: "52px" }}>{t("admin.brands.ui.actions")}</th>
                   </tr>
                 </thead>

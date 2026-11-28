@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element -- dynamic remote URL + onError fallback */
 "use client";
 
 import { useState } from "react";

@@ -214,10 +214,13 @@ export function CartProvider({ children }) {
   useEffect(() => {
     const stored = readLocalCart();
     cartRef.current = stored;
-    setCart(stored);
     const storedSel = readLocalSelection();
     selectedRef.current = storedSel;
-    setSelectedKeys(storedSel);
+    // microtask: localStorage hydrate, effect body me sync setState nahi
+    queueMicrotask(() => {
+      setCart(stored);
+      setSelectedKeys(storedSel);
+    });
   }, []);
 
   useEffect(() => {
@@ -227,12 +230,14 @@ export function CartProvider({ children }) {
 
     if (!userId) {
       cartRef.current = [];
-      setCart([]);
       writeLocalCart([]);
       // Clear selection when logged out
       selectedRef.current = [];
-      setSelectedKeys([]);
       writeLocalSelection([]);
+      queueMicrotask(() => {
+        setCart([]);
+        setSelectedKeys([]);
+      });
       return;
     }
 

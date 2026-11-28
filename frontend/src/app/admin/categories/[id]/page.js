@@ -1507,8 +1507,11 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
   const { data: allCategories = [] } = useQuery({ queryKey: ["admin-categories", "options", locale], queryFn: () => categoryApi.getOptions(locale), enabled: !!categoryId, staleTime: 60_000 });
   const { data: allAttributes = [] } = useQuery({ queryKey: ["all-attributes"], queryFn: () => attributeApi.getAll(), enabled: showAttrSelectModal || showCreateAttrModal });
 
-  useEffect(() => {
-    if (category) {
+  // Category load/refresh par form sync (render ke dauran adjust)
+  const [prevCategory, setPrevCategory] = useState(null);
+  if (category && category !== prevCategory) {
+    setPrevCategory(category);
+    {
       const loadedAttrs = (category.attributes || []).map((a, i) => {
         let value = a.value;
         const attrObj = a.attribute_id;
@@ -1530,7 +1533,7 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
       // kuch nahi chhua), is liye save par `is_active` nahi jayega.
       setStatusTouched(false);
     }
-  }, [category]);
+  }
 
   const updateMutation = useMutation({
     mutationFn: (data) => categoryApi.update(categoryId, data),

@@ -65,7 +65,10 @@ function EditShippingModal({ open, type, config, onClose, onSave, saving }) {
   const { t } = useTranslation();
   const [form, setForm] = useState({ fee: 0, min_days: 0, max_days: 0 });
 
-  useEffect(() => {
+  // open/config/type badalne par form sync (render ke dauran adjust)
+  const [prevEditDeps, setPrevEditDeps] = useState({ open: undefined, config: undefined, type: undefined });
+  if (prevEditDeps.open !== open || prevEditDeps.config !== config || prevEditDeps.type !== type) {
+    setPrevEditDeps({ open, config, type });
     if (open && config) {
       if (type === "standard") {
         setForm({
@@ -81,7 +84,7 @@ function EditShippingModal({ open, type, config, onClose, onSave, saving }) {
         });
       }
     }
-  }, [open, config, type]);
+  }
 
   if (!open) return null;
 
@@ -244,7 +247,10 @@ function ShippingMethodModal({ open, method, onClose, onSave, saving }) {
   const { t } = useTranslation();
   const [form, setForm] = useState({ name: "", fee: 0, min_days: 2, max_days: 4, is_active: true });
 
-  useEffect(() => {
+  // open/method badalne par form sync (render ke dauran adjust)
+  const [prevMethodDeps, setPrevMethodDeps] = useState({ open: undefined, method: undefined });
+  if (prevMethodDeps.open !== open || prevMethodDeps.method !== method) {
+    setPrevMethodDeps({ open, method });
     if (open) {
       if (method) {
         setForm({
@@ -258,7 +264,7 @@ function ShippingMethodModal({ open, method, onClose, onSave, saving }) {
         setForm({ name: "", fee: 0, min_days: 2, max_days: 4, is_active: true });
       }
     }
-  }, [open, method]);
+  }
 
   if (!open) return null;
 

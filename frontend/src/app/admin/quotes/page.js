@@ -68,9 +68,8 @@ export default function QuotesPage() {const { t, dir, locale } = useTranslation(
   const startIndex = pagination.total > 0 ? (currentPage - 1) * pagination.limit + 1 : 0;
   const endIndex = Math.min(currentPage * pagination.limit, pagination.total);
 
-  useEffect(() => {
-    if (Number.isInteger(pagination.page) && pagination.page > 0 && pagination.page !== page) setPage(pagination.page);
-  }, [pagination.page, page]);
+  // Server page se sync (render ke dauran adjust)
+  if (Number.isInteger(pagination.page) && pagination.page > 0 && pagination.page !== page) setPage(pagination.page);
 
   const stats = quotesResponse?.stats || { total: 0, sent: 0, accepted: 0, rejected: 0 };
   const statCards = [

@@ -322,11 +322,10 @@ const [viewMode, setViewMode] = useState(() => {
   //    "Showing 21–40 of 1,099" aur buttons turant update hote hain.
   const paginationSignature = `${search}|${filterCategory}|${filterBrand}|${filterStatus}|${productsPerPage}|${locale}`;
   const [paginationMemory, setPaginationMemory] = useState(null);
-  useEffect(() => {
-    if (productsData?.pagination) {
-      setPaginationMemory({ signature: paginationSignature, pagination: productsData.pagination });
-    }
-  }, [productsData, paginationSignature]);
+  // Pagination yaad rakho (render ke dauran adjust)
+  if (productsData?.pagination && (paginationMemory?.pagination !== productsData.pagination || paginationMemory?.signature !== paginationSignature)) {
+    setPaginationMemory({ signature: paginationSignature, pagination: productsData.pagination });
+  }
   const rememberedPagination =
     paginationMemory?.signature === paginationSignature ? paginationMemory.pagination : null;
 
@@ -344,14 +343,6 @@ const [viewMode, setViewMode] = useState(() => {
   const productStats = summaryData || productsData?.stats || null;
   const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: () => categoryApi.getOptions(), retry: false });
   const { data: brands = [] } = useQuery({ queryKey: ["brand-options"], queryFn: () => brandApi.getOptions(), retry: false });
-
-  useEffect(() => {
-    if (formData.category_id) {
-      fetchCategoryAttributes(formData.category_id, editingProduct);
-    } else {
-      setCategoryAttributes([]);
-    }
-  }, [formData.category_id]);
 
   const fetchCategoryAttributes = async (catId, productForMerge = null) => {
     try {
@@ -414,6 +405,17 @@ const [viewMode, setViewMode] = useState(() => {
       setLoadingAttributes(false);
     }
   };
+
+  // fetchCategoryAttributes declare hone ke baad — sirf category change par refetch
+  useEffect(() => {
+    // microtask: fetch fn sync setState karta hai, effect body me direct nahi
+    if (formData.category_id) {
+      queueMicrotask(() => fetchCategoryAttributes(formData.category_id, editingProduct));
+    } else {
+      queueMicrotask(() => setCategoryAttributes([]));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- editingProduct/fetch fn change par refetch nahi chahiye
+  }, [formData.category_id]);
 
   const handleAddVariantAttributeValue = async (attr, optionLabel, variantIndex) => {
     const trimmed = String(optionLabel || "").trim();
@@ -519,6 +521,7 @@ const [viewMode, setViewMode] = useState(() => {
     if (msg.includes("permission") || msg.includes("access denied") || msg.includes("forbidden")) {
       toast.error(t("errors.noPermissionView"), { duration: 6000, description: t("errors.contactAdmin") });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- i18n t identity
   }, [productsError, productsErrorMsg]);
 
   /* Mutations */
@@ -828,7 +831,8 @@ const [viewMode, setViewMode] = useState(() => {
   // is liye yahan koi client-side filtering/slicing nahi. Jo data aaya wohi current page hai.
   const paginatedProducts = products;
   const totalPages = Math.max(1, Number(pagination.pages) || 1);
-  useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
+  // Page clamp (render ke dauran adjust)
+  if (currentPage > totalPages) setCurrentPage(totalPages);
 
   // ✅ Stats ab server se aate hain (poori filtered dataset par, sirf current page par nahi).
   // Agar stats missing hon (legacy response) to current page data se fallback.

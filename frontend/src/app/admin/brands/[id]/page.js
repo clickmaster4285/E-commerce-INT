@@ -388,7 +388,7 @@ export default function BrandDetailPage() {
   const fileInputRef = useRef(null);
 
   // Country Data
-  const allCountries = useMemo(() => (geo?.Country ? geo.Country.getAllCountries() : []).map((c) => ({ name: c.name, isoCode: c.isoCode })), []);
+  const allCountries = useMemo(() => (geo?.Country ? geo.Country.getAllCountries() : []).map((c) => ({ name: c.name, isoCode: c.isoCode })), [geo]);
 
   const { data: brand, isLoading: loading } = useQuery({
     queryKey: ["brand", brandId, locale],

@@ -238,7 +238,7 @@ export default function CartPage() {
     //    so an express-only deal shows EXPRESS + FREE here too.
     const freeShippingActiveForDefault = isFreeShippingApplicable(activeFreeShippingDeal, shippingMethod);
     return { subtotal, totalSavings, tax, hasFreeShippingDeal: hasFreeShippingDealFlag, freeShippingActiveForDefault, allItems };
-  }, [groupedItems, selectedItems, isLineSelected, dealsList, activeFreeShippingDeal, shippingMethod]);
+  }, [groupedItems, selectedItems, isLineSelected, activeFreeShippingDeal, shippingMethod]);
 
   const shipItemsKey = totals.allItems.map((i) => `${i.raw.productId || i.raw.id}:${i.raw.qty || i.qty || 1}`).join(",");
   const [debouncedShipKey, setDebouncedShipKey] = useState(shipItemsKey);

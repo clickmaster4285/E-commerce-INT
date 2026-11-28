@@ -107,13 +107,15 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel, inlin
     }
   }, [initialAddress, fresh]);
 
-  useEffect(() => {
-    if (!initialAddress && !fresh && detectedCountry && !form.country) {
-      setForm((current) => ({ ...current, country: detectedCountry }));
-    }
-  }, [detectedCountry, initialAddress, fresh, form.country]);
+  // Detected country form me daalo (render ke dauran adjust)
+  if (!initialAddress && !fresh && detectedCountry && !form.country) {
+    setForm((current) => ({ ...current, country: detectedCountry }));
+  }
 
-  useEffect(() => {
+  // User se name/phone prefill (render ke dauran adjust)
+  const [prevUserSeed, setPrevUserSeed] = useState({ user: undefined, initialAddress: undefined, fresh: undefined });
+  if (prevUserSeed.user !== user || prevUserSeed.initialAddress !== initialAddress || prevUserSeed.fresh !== fresh) {
+    setPrevUserSeed({ user, initialAddress, fresh });
     if (!initialAddress && !fresh && user) {
       setForm((current) => ({
         ...current,
@@ -121,7 +123,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel, inlin
         phone: current.phone || normalizePhone(user.phone || ""),
       }));
     }
-  }, [user, initialAddress, fresh]);
+  }
 
   const allCountries = ALL_COUNTRIES;
   const isPhoneValidForCountry = (value, countryName) => {
@@ -147,6 +149,8 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel, inlin
 
   useEffect(() => {
     if (!pendingCityCandidates?.length || !allCities.length) return;
+    // microtask: effect body me sync setState (updateField) nahi
+    queueMicrotask(() => {
     for (const candidate of pendingCityCandidates) {
       const want = normalizeCityName(candidate);
       if (!want) continue;
@@ -170,6 +174,8 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel, inlin
     }
     setPendingCityCandidates(null);
     toast(`⚠️ ${t("checkout.address.locationPartial")}`);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- updateField unstable; loop se bachne ke liye
   }, [allCities, pendingCityCandidates, t]);
 
   const fillLocationFromCurrent = async () => {

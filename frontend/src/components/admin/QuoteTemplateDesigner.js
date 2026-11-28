@@ -325,6 +325,7 @@ function renderRichTerms(html) {
 function OptionalDocumentLogo({ src, alt = "", className = "", style }) {
   const [failedSrc, setFailedSrc] = useState(null);
   if (!src || failedSrc === src) return null;
+  // eslint-disable-next-line @next/next/no-img-element -- dynamic user-uploaded/remote URL; next/image unsuitable
   return <img src={src} alt={alt} className={className} style={style} onError={() => setFailedSrc(src)} />;
 }
 
@@ -1183,7 +1184,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
             : matchedVariants.length === 0 ? <p className="px-3 py-3 text-center text-xs text-fg-muted">{t("admin.quoteDesigner.noVariantsFound")}</p>
             : matchedVariants.map((option) => (
               <button key={option.id} type="button" role="option" aria-selected={String(activeVariantItem?.variant_id || "") === option.id} onMouseDown={(event) => event.preventDefault()} onClick={() => selectVariantForItem(option, activeVariantItem)} className={`flex w-full items-center gap-3 px-3 py-2 text-start transition-colors ${String(activeVariantItem?.variant_id || "") === option.id ? "bg-info-soft" : "hover:bg-subtle"}`}>
-                <span className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden"><Package size={14} className="absolute text-slate-400" />{option.image && <img src={option.image} alt={option.name || ""} loading="lazy" onError={(event) => { event.currentTarget.style.display = "none"; }} className="relative h-full w-full object-cover" />}</span>
+                <span className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden"><Package size={14} className="absolute text-slate-400" />{option.image && <img src={option.image} alt={option.name || ""} loading="lazy" onError={(event) => { event.currentTarget.style.display = "none"; }} className="relative h-full w-full object-cover" />}{/* eslint-disable-line @next/next/no-img-element -- dynamic remote URL */}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[11px] font-semibold text-fg">{option.name}</span>
                   <span className="block truncate text-[9px] text-fg-muted">{option.variant || option.sku || "—"}{option.sku && option.variant ? ` · ${option.sku}` : ""}</span>

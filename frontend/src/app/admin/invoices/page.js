@@ -141,9 +141,8 @@ export default function InvoicesPage() {const { t, locale } = useTranslation();
       : currentPage >= pages - 2 ? [1, "...", pages - 3, pages - 2, pages - 1, pages]
         : [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", pages];
 
-  useEffect(() => {
-    if (Number.isInteger(pagination.page) && pagination.page > 0 && pagination.page !== page) setPage(pagination.page);
-  }, [pagination.page, page]);
+  // Server page se sync (render ke dauran adjust)
+  if (Number.isInteger(pagination.page) && pagination.page > 0 && pagination.page !== page) setPage(pagination.page);
 
   const paymentMutation = useMutation({
     mutationFn: ({ id, payment }) => invoiceApi.recordPayment(id, payment),

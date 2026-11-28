@@ -735,11 +735,10 @@ export default function Dashboard() {
     staleTime: 30000,
   });
 
-  useEffect(() => {
-    if (data?.topProductsPagination?.page && data.topProductsPagination.page !== topProductsPage) setTopProductsPage(data.topProductsPagination.page);
-    if (data?.recentOrdersPagination?.page && data.recentOrdersPagination.page !== recentOrdersPage) setRecentOrdersPage(data.recentOrdersPagination.page);
-    if (data?.activitiesPagination?.page && data.activitiesPagination.page !== activitiesPage) setActivitiesPage(data.activitiesPagination.page);
-  }, [data?.topProductsPagination?.page, data?.recentOrdersPagination?.page, data?.activitiesPagination?.page, topProductsPage, recentOrdersPage, activitiesPage]);
+  // Server page se sync (render ke dauran adjust)
+  if (data?.topProductsPagination?.page && data.topProductsPagination.page !== topProductsPage) setTopProductsPage(data.topProductsPagination.page);
+  if (data?.recentOrdersPagination?.page && data.recentOrdersPagination.page !== recentOrdersPage) setRecentOrdersPage(data.recentOrdersPagination.page);
+  if (data?.activitiesPagination?.page && data.activitiesPagination.page !== activitiesPage) setActivitiesPage(data.activitiesPagination.page);
 
   // Realtime refresh via socket
   useEffect(() => {

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { isAdminRole } from "@/lib/roles";
@@ -595,6 +595,7 @@ export default function AdminLayout({ children }) {
         handlePermissionUpdate
       );
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- socket re-subscribe sirf user id/role/path par; router stable
   }, [
     isLoginPage,
     userData?._id,
@@ -664,6 +665,7 @@ export default function AdminLayout({ children }) {
         </div>
         {!authResult.transientError && <button
           onClick={() => {
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- hard redirect: full reload se auth state/cookies reset
             window.location.href = '/admin/login';
           }}
           className="mt-4 px-5 py-2.5 rounded-md text-sm font-semibold text-white transition hover:opacity-90"

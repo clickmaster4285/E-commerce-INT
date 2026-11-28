@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import LazyGoogleLogin from "./LazyGoogleLogin";
 import {
@@ -12,6 +12,16 @@ import OtpVerifyCard from "./OtpVerifyCard";
 import ResetPasswordCard from "./ResetPasswordCard";
 import { isValidPhone, normalizePhone, PHONE_MAX, PHONE_MIN } from "@/utils/phoneValidator";
 import { useTranslation } from "@/i18n/LanguageProvider";
+
+function FieldError({ field, errors }) {
+  if (!errors[field]) return null;
+  return (
+    <div className="flex items-center gap-1.5 mt-1.5 px-1">
+      <AlertCircle size={12} className="text-user-danger shrink-0" />
+      <p className="text-[0.6875rem] font-semibold text-user-danger">{errors[field]}</p>
+    </div>
+  );
+}
 
 export default function LoginModal({ isOpen, onClose }) {
   const { t } = useTranslation();
@@ -34,15 +44,6 @@ export default function LoginModal({ isOpen, onClose }) {
   const [forgotError, setForgotError] = useState("");
 
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleEsc = (e) => {
-      if (e.key === "Escape") handleClose();
-    };
-    window.addEventListener("keydown", handleEsc);
-    return () => window.removeEventListener("keydown", handleEsc);
-  }, [isOpen]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -276,16 +277,26 @@ export default function LoginModal({ isOpen, onClose }) {
     }
   };
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setName(""); setUsername(""); setPhone(""); setEmail(""); setPassword("");
     setErrors({}); setGeneralError(""); setLoading(false);
     setStep("auth"); setOtpEmail(""); setResetToken(""); setForgotError("");
-  };
+  }, []);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     resetForm();
     onClose();
-  };
+  }, [resetForm, onClose]);
+
+  // handleClose declare hone ke baad Esc listener (har render par re-bind, harmless)
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEsc = (e) => {
+      if (e.key === "Escape") handleClose();
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [isOpen, handleClose]);
 
   const switchMode = () => {
     setIsLogin(!isLogin);
@@ -303,16 +314,6 @@ export default function LoginModal({ isOpen, onClose }) {
         ? "border-user-danger focus:border-user-danger focus:ring-2 focus:ring-user-danger/15"
         : "border-user-line focus:border-user-accent focus:ring-2 focus:ring-user-accent/15"
     }`;
-  };
-
-  const FieldError = ({ field }) => {
-    if (!errors[field]) return null;
-    return (
-      <div className="flex items-center gap-1.5 mt-1.5 px-1">
-        <AlertCircle size={12} className="text-user-danger shrink-0" />
-        <p className="text-[0.6875rem] font-semibold text-user-danger">{errors[field]}</p>
-      </div>
-    );
   };
 
   if (!isOpen) return null;
@@ -500,7 +501,7 @@ export default function LoginModal({ isOpen, onClose }) {
                         className={getInputCls("name")}
                       />
                     </div>
-                    <FieldError field="name" />
+                    <FieldError field="name" errors={errors} />
                   </div>
 
                   <div>
@@ -514,7 +515,7 @@ export default function LoginModal({ isOpen, onClose }) {
                         className={getInputCls("username")}
                       />
                     </div>
-                    <FieldError field="username" />
+                    <FieldError field="username" errors={errors} />
                   </div>
 
                   <div>
@@ -530,7 +531,7 @@ export default function LoginModal({ isOpen, onClose }) {
                         className={getInputCls("phone")}
                       />
                     </div>
-                    <FieldError field="phone" />
+                    <FieldError field="phone" errors={errors} />
                   </div>
                 </>
               )}
@@ -546,7 +547,7 @@ export default function LoginModal({ isOpen, onClose }) {
                     className={getInputCls("email")}
                   />
                 </div>
-                <FieldError field="email" />
+                <FieldError field="email" errors={errors} />
               </div>
 
               <div>
@@ -560,7 +561,7 @@ export default function LoginModal({ isOpen, onClose }) {
                     className={getInputCls("password")}
                   />
                 </div>
-                <FieldError field="password" />
+                <FieldError field="password" errors={errors} />
               </div>
 
               {/* ✅ FORGOT PASSWORD — OTP flow */}

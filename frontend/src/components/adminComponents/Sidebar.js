@@ -47,7 +47,11 @@ function StoreMark({
   roundedClass = "rounded-lg",
 }) {
   const [imageFailed, setImageFailed] = useState(false);
-  useEffect(() => setImageFailed(false), [logoUrl]);
+  const [prevLogoUrl, setPrevLogoUrl] = useState(logoUrl);
+  if (prevLogoUrl !== logoUrl) {
+    setPrevLogoUrl(logoUrl);
+    setImageFailed(false);
+  }
   const showLogo = Boolean(logoUrl && !imageFailed);
 
   return (

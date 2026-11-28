@@ -58,14 +58,18 @@ function TabGrid({ tab }) {
 
   const totalPages = pagination?.pages || Math.max(1, Math.ceil(total / PER_PAGE));
   const currentPage = pagination?.page || Math.min(page, totalPages);
-  useEffect(() => {
-    if (!pagination || pagination.page !== page || !products.length) return;
-    setDisplayedProducts((current) => {
-      if (page === 1) return products;
-      const seen = new Set(current.map((product) => idOf(product._id)));
-      return [...current, ...products.filter((product) => !seen.has(idOf(product._id)))];
-    });
-  }, [page, pagination, products]);
+  // Naye page ke products accumulate karo (render ke dauran adjust)
+  const [seenDisplay, setSeenDisplay] = useState({ page: undefined, pagination: undefined, products: undefined });
+  if (seenDisplay.page !== page || seenDisplay.pagination !== pagination || seenDisplay.products !== products) {
+    setSeenDisplay({ page, pagination, products });
+    if (pagination && pagination.page === page && products.length) {
+      setDisplayedProducts((current) => {
+        if (page === 1) return products;
+        const seen = new Set(current.map((product) => idOf(product._id)));
+        return [...current, ...products.filter((product) => !seen.has(idOf(product._id)))];
+      });
+    }
+  }
 
   if (isLoading && !products.length) {
     return (

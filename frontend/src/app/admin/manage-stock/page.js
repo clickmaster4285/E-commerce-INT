@@ -288,12 +288,11 @@ export default function ManageStockPage() {
     queryFn: () => stockApi.getAllPaginated({ page: currentPage, limit: itemsPerPage, search: debouncedSearch, status: statusFilter, locale }),
     retry: false,
   });
-  useEffect(() => {
-    const serverPage = paginatedStockData?.pagination?.page;
-    if (Number.isInteger(serverPage) && serverPage > 0 && serverPage !== currentPage) {
-      setCurrentPage(serverPage);
-    }
-  }, [paginatedStockData?.pagination?.page, currentPage]);
+  // Server page se sync (render ke dauran adjust)
+  const serverStockPage = paginatedStockData?.pagination?.page;
+  if (Number.isInteger(serverStockPage) && serverStockPage > 0 && serverStockPage !== currentPage) {
+    setCurrentPage(serverStockPage);
+  }
   const stockItems = useMemo(() => Array.isArray(paginatedStockData?.items)
     ? paginatedStockData.items
     : Array.isArray(paginatedStockData)

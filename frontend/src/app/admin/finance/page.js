@@ -176,7 +176,12 @@ function FinanceDrawer({ transaction, onClose, locale, t }) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [transaction, onClose]);
-  useEffect(() => { setItemsPage(1); setHistoryPage(1); }, [transaction?.id]);
+  const [prevTxId, setPrevTxId] = useState(transaction?.id);
+  if (transaction?.id !== prevTxId) {
+    setPrevTxId(transaction?.id);
+    setItemsPage(1);
+    setHistoryPage(1);
+  }
   if (!transaction) return null;
   const Icon = categoryIcons[transaction.category] || Banknote;
   const isIncome = transaction.amount >= 0;

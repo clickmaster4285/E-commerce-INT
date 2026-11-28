@@ -75,23 +75,35 @@ export default function NewInvoicePage() {const { t } = useTranslation();
   const { data: prefilledCustomer } = useQuery({ queryKey: ["invoice-customer-prefill", prefillCustomerId], queryFn: () => customerApi.getById(prefillCustomerId, { slim: true }), enabled: Boolean(prefillCustomerId && !prefillQuoteId) });
   const { data: prefilledQuote } = useQuery({ queryKey: ["invoice-quote-prefill", prefillQuoteId], queryFn: () => quoteApi.getById(prefillQuoteId), enabled: Boolean(prefillQuoteId) });const { data: companySettings } = useQuery({ queryKey: ["admin-store-info"], queryFn: storeApi.get });
   const { data: pickerRaw = [], isLoading: productsLoading } = useQuery({ queryKey: ["invoice-variant-picker"], queryFn: () => variantApi.getPicker({ limit: 50 }), staleTime: 2 * 60 * 1000 });
-  const customers = useMemo(() => listOf(rawCustomers).filter((customer) => !customer.is_deleted), [rawCustomers]);useEffect(() => { const defaultTerms = companySettings?.invoice_terms_conditions ?? ""; if (!editInvoiceId && !prefillQuoteId && defaultTerms !== undefined && defaultTerms !== null) setForm((current) => ({ ...current, terms: defaultTerms })); }, [editInvoiceId, prefillQuoteId, companySettings?.invoice_terms_conditions]);
+  const customers = useMemo(() => listOf(rawCustomers).filter((customer) => !customer.is_deleted), [rawCustomers]);
+  // Default terms sync (render ke dauran adjust; key badalne par hi chalta hai)
+  const defaultInvoiceTerms = companySettings?.invoice_terms_conditions ?? "";
+  const invoiceTermsKey = `${editInvoiceId}|${prefillQuoteId}|${defaultInvoiceTerms}`;
+  const [seenInvoiceTermsKey, setSeenInvoiceTermsKey] = useState(null);
+  if (seenInvoiceTermsKey !== invoiceTermsKey) {
+    setSeenInvoiceTermsKey(invoiceTermsKey);
+    if (!editInvoiceId && !prefillQuoteId) setForm((current) => ({ ...current, terms: defaultInvoiceTerms }));
+  }
   useEffect(() => {
+    // URL params browser se padhne hain; microtask me setState (effect body me sync nahi)
     const params = new URLSearchParams(window.location.search);
-    setPrefillCustomerId(params.get("customer") || "");
-    setPrefillQuoteId(params.get("quote") || "");
-    setEditInvoiceId(params.get("invoice") || "");
+    queueMicrotask(() => {
+      setPrefillCustomerId(params.get("customer") || "");
+      setPrefillQuoteId(params.get("quote") || "");
+      setEditInvoiceId(params.get("invoice") || "");
+    });
   }, []);
-  useEffect(() => {
-    if (!prefillCustomerId || prefillQuoteId) return;
+  // Prefilled customer ko form me apply karo (render ke dauran adjust)
+  const [seenPrefilledCustomer, setSeenPrefilledCustomer] = useState(null);
+  if (prefillCustomerId && !prefillQuoteId && prefilledCustomer && prefilledCustomer !== seenPrefilledCustomer) {
     const customer = prefilledCustomer;
-    if (!customer) return;
+    setSeenPrefilledCustomer(customer);
     setForm((current) => {
       const next = { customer_id: customer._id, customer_name: customer.name || "", customer_email: customer.email || "", customer_phone: customer.phone || "", customer_address: customer.address || "" };
       if (current.customer_id === next.customer_id && current.customer_name === next.customer_name && current.customer_email === next.customer_email && current.customer_phone === next.customer_phone && current.customer_address === next.customer_address) return current;
       return { ...current, ...next };
     });
-  }, [prefillCustomerId, prefilledCustomer, prefillQuoteId]);
+  }
   const variants = useMemo(() => {
     return listOf(pickerRaw).map((variant) => {
       const product = variant.product && typeof variant.product === "object" ? variant.product : {};
@@ -125,8 +137,10 @@ export default function NewInvoicePage() {const { t } = useTranslation();
       return { row_id: rowId(), product_id: String(item.product_id?._id || item.product_id || selectedVariant?.product_id || ""), variant_id: String(item.variant_id?._id || item.variant_id || ""), name: selectedVariant?.productName || name || item.name || "", variant_name: selectedVariant?.variantName || parts.join(" / "), sku: item.sku || selectedVariant?.sku || "", image: item.image || selectedVariant?.image || "", quantity: Number(item.quantity) || 1, unit_price: Number(item.unit_price) || 0, discount_rate: Number(item.discount_rate) || 0, tax_rate: Number(item.tax_rate) || 0 };
     });
     const paymentTerms = ["Due on receipt", "Net 7", "Net 14", "Net 30"].includes(editingInvoice.payment_terms) ? editingInvoice.payment_terms : "Custom";
-    setForm({ customer_id: String(editingInvoice.customer_id?._id || editingInvoice.customer_id || ""), customer_name: editingInvoice.customer_name || "", customer_email: editingInvoice.customer_email || "", customer_phone: editingInvoice.customer_phone || "", customer_address: editingInvoice.customer_address || "", invoice_date: dateInput(editingInvoice.invoice_date), due_date: dateInput(editingInvoice.due_date), payment_terms: paymentTerms, custom_payment_terms: paymentTerms === "Custom" ? editingInvoice.payment_terms || "" : "", overall_discount_rate: String(editingInvoice.overall_discount_rate ?? 0), overall_discount_type: editingInvoice.overall_discount_type || "percent", tax_rate: String(editingInvoice.tax_rate ?? 0), bank_details: editingInvoice.bank_details || "", terms: editingInvoice.terms || "", items });
-    setEditInvoiceLoaded(true);
+    queueMicrotask(() => {
+      setForm({ customer_id: String(editingInvoice.customer_id?._id || editingInvoice.customer_id || ""), customer_name: editingInvoice.customer_name || "", customer_email: editingInvoice.customer_email || "", customer_phone: editingInvoice.customer_phone || "", customer_address: editingInvoice.customer_address || "", invoice_date: dateInput(editingInvoice.invoice_date), due_date: dateInput(editingInvoice.due_date), payment_terms: paymentTerms, custom_payment_terms: paymentTerms === "Custom" ? editingInvoice.payment_terms || "" : "", overall_discount_rate: String(editingInvoice.overall_discount_rate ?? 0), overall_discount_type: editingInvoice.overall_discount_type || "percent", tax_rate: String(editingInvoice.tax_rate ?? 0), bank_details: editingInvoice.bank_details || "", terms: editingInvoice.terms || "", items });
+      setEditInvoiceLoaded(true);
+    });
   }, [editInvoiceId, editingInvoice, editInvoiceLoaded, variants, productsLoading, router]);
   useEffect(() => {
     if (!prefillQuoteId || !prefilledQuote || productsLoading || appliedQuoteId.current === prefillQuoteId) return;

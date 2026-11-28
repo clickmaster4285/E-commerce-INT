@@ -486,6 +486,18 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
 // ==========================================
 // MAIN COMPONENT
 // ==========================================
+const SELECT_INPUT_STYLE = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
+const SelectFilter = ({ value, onChange, children }) => (
+  <div className="relative">
+    <select value={value} onChange={onChange} className="appearance-none h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-accent-soft" style={SELECT_INPUT_STYLE}>
+      {children}
+    </select>
+    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}>
+      <ChevronDownIcon className="w-3.5 h-3.5" />
+    </span>
+  </div>
+);
+
 export default function BannersPage() {
   const { t, locale, dir } = useTranslation();
   const { contentOf, nameOf, productNameOf } = useLocalized();
@@ -558,10 +570,16 @@ export default function BannersPage() {
   }, [isError, error, t]);
 
   // ✅ Sirf current page ke banners aate hain backend se (server paginated)
-  const banners = Array.isArray(paginatedBannersData?.items) ? paginatedBannersData.items : [];
+  const banners = useMemo(
+    () => (Array.isArray(paginatedBannersData?.items) ? paginatedBannersData.items : []),
+    [paginatedBannersData]
+  );
   const bannerCounts = paginatedBannersData?.counts || { total: 0, active: 0, inactive: 0, scheduled: 0, expired: 0, draft: 0 };
   const bannerTypes = Array.isArray(paginatedBannersData?.bannerTypes) ? paginatedBannersData.bannerTypes : [];
-  const usedPositions = Array.isArray(paginatedBannersData?.positions) ? paginatedBannersData.positions : [];
+  const usedPositions = useMemo(
+    () => (Array.isArray(paginatedBannersData?.positions) ? paginatedBannersData.positions : []),
+    [paginatedBannersData]
+  );
   const pagination = paginatedBannersData?.pagination || { total: 0, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
   const bannersAlreadyTranslated = locale === "en" || (banners.length > 0 && banners.every((banner) => typeof banner.translations?.title?.[locale] === "string" && banner.translations.title[locale].trim()));
   const bannerTranslationsReady = usePageTranslations({ model: "Banner", records: banners, locale, ready: !isFetching && pagination.page === currentPage, queryKey: bannersQueryKey, queryClient, alreadyTranslated: bannersAlreadyTranslated, fallbackAfterRetries: true });
@@ -1094,24 +1112,13 @@ export default function BannersPage() {
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
   const inputStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
-  const SortHeader = ({ label, sortKey }) => (
+  const renderSortHeader = ({ label, sortKey }) => (
     <th className="px-4 py-3 text-left">
       <button type="button" onClick={() => handleSort(sortKey)} className="inline-flex items-center gap-1 text-[12px] font-semibold uppercase tracking-wider transition hover:opacity-80" style={{ color: sortConfig.key === sortKey ? "var(--text-primary)" : "var(--text-muted)" }}>
         {label}
         <SortIndicator active={sortConfig.key === sortKey} direction={sortConfig.direction} />
       </button>
     </th>
-  );
-
-  const SelectFilter = ({ value, onChange, children }) => (
-    <div className="relative">
-      <select value={value} onChange={onChange} className="appearance-none h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-accent-soft" style={inputStyle}>
-        {children}
-      </select>
-      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}>
-        <ChevronDownIcon className="w-3.5 h-3.5" />
-      </span>
-    </div>
   );
 
   const ActionButtons = ({ banner }) => {
@@ -1340,11 +1347,11 @@ export default function BannersPage() {
                       <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} />
                     </th>
                     <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.banners.page.preview")}</th>
-                    <SortHeader label={t("admin.banners.detail.title")} sortKey="title" />
-                    <SortHeader label={t("admin.promotions.ui.generated.d0a3e7f81a98")} sortKey="bannerType" />
-                    <SortHeader label={t("admin.brands.detail.productTableStatus")} sortKey="status" />
+                    {renderSortHeader({ label: t("admin.banners.detail.title"), sortKey: "title" })}
+                    {renderSortHeader({ label: t("admin.promotions.ui.generated.d0a3e7f81a98"), sortKey: "bannerType" })}
+                    {renderSortHeader({ label: t("admin.brands.detail.productTableStatus"), sortKey: "status" })}
                     <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>{t("admin.banners.page.schedule")}</th>
-                    <SortHeader label={t("admin.promotions.ui.generated.1478c028a167")} sortKey="position" />
+                    {renderSortHeader({ label: t("admin.promotions.ui.generated.1478c028a167"), sortKey: "position" })}
                     <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>{t("admin.banners.page.actions")}</th>
                   </tr>
                 </thead>

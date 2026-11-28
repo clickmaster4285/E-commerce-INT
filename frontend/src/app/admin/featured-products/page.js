@@ -348,7 +348,9 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
   const [orig, setOrig] = useState({});
 
   // Modal khulte hi sab state reset
-  useEffect(() => {
+  const [prevOpen, setPrevOpen] = useState(false);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
     if (open) {
       setSearch("");
       setDebounced("");
@@ -356,7 +358,7 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
       setDraft({});
       setOrig({});
     }
-  }, [open]);
+  }
 
   // Debounced search
   useEffect(() => {
@@ -415,8 +417,7 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
   const isBrandNameReady = (brand) => locale === "en" || brandTranslationsReady || !brandNameState.mostlyUntranslated || brandNameState.hasTranslation(brand);
 
   // Naye loaded products ke original state capture karo (draft ko touch na karo)
-  useEffect(() => {
-    if (!open || !products.length) return;
+  if (open && products.length && products.some((p) => !(p._id in orig))) {
     setOrig((prev) => {
       let changed = false;
       const next = { ...prev };
@@ -428,7 +429,7 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
       });
       return changed ? next : prev;
     });
-  }, [products, open]);
+  }
 
   const valueOf = (p) =>
     Object.prototype.hasOwnProperty.call(draft, p._id)

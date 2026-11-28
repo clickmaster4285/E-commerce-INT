@@ -309,6 +309,7 @@ export function useDiscounts() {
         matchedDeal: matchedDeal,
       };
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deals ref stable nahi; callback ko re-create nahi karna
     [discounts, dealCandidates],
   );
 

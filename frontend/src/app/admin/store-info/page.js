@@ -614,7 +614,7 @@ export default function StoreInfoPage() {
 
   useEffect(() => {
     if (!socket || !isConnected) {
-      if (!isConnected) setFetching(false);
+      if (!isConnected) queueMicrotask(() => setFetching(false));
       return;
     }
 
@@ -668,6 +668,7 @@ export default function StoreInfoPage() {
       socket.off("storeInfo", handleStoreData);
       socket.off("storeUpdated", handleStoreUpdate);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- syncStoreCache unstable; socket re-bind nahi chahiye
   }, [socket, isConnected, queryClient]);
 
   // ====================================================

@@ -1,6 +1,6 @@
 "use client";import { useTranslation } from "@/i18n/LanguageProvider";
 
-import { use, useEffect, useRef, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { quoteApi } from "@/apis/admin/quoteApi";
@@ -29,7 +29,7 @@ export default function QuoteDetailPage({ params }) {const { t } = useTranslatio
   const { data: quote, isLoading, isError, error } = useQuery({ queryKey: ["quote-admin", id], queryFn: () => quoteApi.getById(id) });
   const { data: store = null, isLoading: isStoreLoading } = useQuery({ queryKey: ["store-public"], queryFn: () => storeApi.getPublic(), staleTime: 5 * 60 * 1000 });
   // getQuote already returns item names — no full /variants load (§9.3)
-  const quoteWithVariantNames = quote
+  const quoteWithVariantNames = useMemo(() => (quote
     ? {
         ...quote,
         items: (quote.items || []).map((item) => ({
@@ -37,7 +37,7 @@ export default function QuoteDetailPage({ params }) {const { t } = useTranslatio
           variant_name: item.variant_name || item.variant_id?.title || "",
         })),
       }
-    : null;
+    : null), [quote]);
   const isVariantsLoading = false;
   useEffect(() => {
     if (searchParams.get("print") !== "1" || !quote || isLoading || isStoreLoading || isVariantsLoading || printHandled.current) return undefined;

@@ -496,7 +496,8 @@ function CheckoutContent() {
     if (addressSelectionLocked.current) return;
     if (!selectedAddressId && addresses.length) {
       const def = addresses.find((a) => a.is_default) || addresses[0];
-      setSelectedAddressId(def._id);
+      // microtask: effect body me sync setState nahi (ref lock ki wajah se derive mumkin nahi)
+      queueMicrotask(() => setSelectedAddressId(def._id));
     }
   }, [addresses, selectedAddressId, draftReady]);
 
@@ -632,7 +633,12 @@ function CheckoutContent() {
     setStep(1);
   };
 
-  useEffect(() => { if (user?.phone) setPhone((p) => p || normalizePhone(user.phone)); }, [user]);
+  // user change par phone prefill (render ke dauran adjust)
+  const [phoneSyncedUser, setPhoneSyncedUser] = useState(null);
+  if (user !== phoneSyncedUser) {
+    setPhoneSyncedUser(user);
+    if (user?.phone) setPhone((p) => p || normalizePhone(user.phone));
+  }
 
   const handlePhoneChange = (event) => {
     setPhone(event.target.value.replace(/\D/g, "").slice(0, PHONE_MAX));
@@ -658,7 +664,7 @@ function CheckoutContent() {
   // ✅ Items to checkout = CartContext selection (persists in localStorage).
   //    On draft restore, the local `selectedKeys` seed is used only as a one-shot
   //    import into CartContext (handled in the draft-restore effect above).
-  const selectedCartItems = useMemo(() => selectedItems, [selectedItems]);
+  const selectedCartItems = selectedItems;
   const activeItems = step === 1 ? selectedCartItems : draftItems;
   useEffect(() => {
     if (!draftReady || placing || step !== 1 || activeItems.length === 0) return;
@@ -667,6 +673,7 @@ function CheckoutContent() {
       toast.error(formatDealRequirementIssue(dealIssue, { t, localizedName: text(dealIssue.item?.name, dealIssue.item?.translations?.name) }));
       router.replace("/cart");
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- i18n t identity; text helper unstable
   }, [activeItems, draftReady, placing, router, step]);
 
   // ✅ Shared helper — single source of truth for free-shipping qualification.
@@ -682,11 +689,12 @@ function CheckoutContent() {
 
   // ✅ Sync `shippingMethod` to the deal-derived default on initial load only.
   //    Once the user has manually selected a method, don't override their choice.
-  useEffect(() => {
-    if (userSelectedShipping) return;
-    const next = getDefaultShippingMethod(activeFreeShippingDeal);
-    setShippingMethod((prev) => (prev !== next ? next : prev));
-  }, [activeFreeShippingDeal, userSelectedShipping]);
+  const defaultShippingNext = getDefaultShippingMethod(activeFreeShippingDeal);
+  const [shippingDefaultSeen, setShippingDefaultSeen] = useState(null);
+  if (!userSelectedShipping && shippingDefaultSeen !== defaultShippingNext) {
+    setShippingDefaultSeen(defaultShippingNext);
+    setShippingMethod((prev) => (prev !== defaultShippingNext ? defaultShippingNext : prev));
+  }
 
   const itemsWithDiscounts = activeItems.map((i) => {
     const qty = Number(i.qty) || 1;
@@ -835,6 +843,7 @@ function CheckoutContent() {
       }).catch(() => {});
     }, 800);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- itemsWithDiscounts har render naya array; underlying inputs deps me hain
   }, [selectedKeys, selectedAddressId, shippingMethod, paymentMethod, user, step, draftItems, currentDraftId, placing, draftSubtotal, shipping, tax, draftDiscount, draftEstimatedTotal]);
 
   const selectedAddress = addresses.find((a) => a._id === selectedAddressId);
@@ -1020,7 +1029,7 @@ function CheckoutContent() {
   // ✅ Secondary buttons — outline style, glow nahi (shared PrimaryButton sirf primary CTAs ke liye)
   const ghostBtn = "border-2 border-user-line text-user-fg-secondary hover:text-user-fg hover:border-user-accent/40 transition";
 
-  const SummaryPanel = ({ footer, showItems = true, review = false }) => (
+  const renderSummaryPanel = ({ footer, showItems = true, review = false }) => (
     <div className={`checkout-summary-panel ${showItems ? "checkout-summary-panel-with-items" : ""} ${review ? "checkout-summary-panel-review" : ""} h-auto w-full min-w-0 rounded-2xl border border-user-line bg-user-card p-4 shadow-sm sm:p-5 lg:sticky lg:top-[4.5rem]`}>
       <div className={`checkout-summary-header flex shrink-0 items-center gap-3 ${review ? "mb-3 border-b border-user-line pb-3" : "mb-4"}`}>
         <span className={`checkout-summary-icon flex shrink-0 items-center justify-center border text-user-accent ${review ? "h-9 w-9 rounded-lg" : "h-10 w-10 rounded-xl"}`}>
@@ -1236,7 +1245,7 @@ function CheckoutContent() {
               </div>
 
               {/* RIGHT: Summary with Proceed button */}
-              <SummaryPanel showItems={false} footer={
+              {renderSummaryPanel({ showItems: false, footer: (
                 <div className="space-y-3">
                   <PrimaryButton
                     onClick={proceedToStep2}
@@ -1251,7 +1260,7 @@ function CheckoutContent() {
                     <span className="font-semibold">{t("checkout.secureSsl")}</span>
                   </div>
                 </div>
-              } />
+              )})}
             </div>
           )}
           {/* Mobile sticky Proceed bar (step 1) */}
@@ -1501,7 +1510,7 @@ function CheckoutContent() {
                 </div>
               </div>
 
-              <SummaryPanel footer={
+              {renderSummaryPanel({ footer: (
                 <div className="space-y-3">
                   <PrimaryButton
                     onClick={() => selectedAddressId ? goToStep(3) : toast.error(t("checkout.address.selectOrAdd"))}
@@ -1514,7 +1523,7 @@ function CheckoutContent() {
                     <ArrowLeft size={14} /> {t("checkout.backToCart")}
                   </button>
                 </div>
-              } />
+              )})}
             </div>
           )}
 
@@ -1596,7 +1605,7 @@ function CheckoutContent() {
                 </div>
               </div>
 
-              <SummaryPanel showItems={false} review footer={
+              {renderSummaryPanel({ showItems: false, review: true, footer: (
                 <div className="space-y-3">
                   <PrimaryButton
                     onClick={placeOrder}
@@ -1615,7 +1624,7 @@ function CheckoutContent() {
                     <span className="text-xs text-user-fg-muted font-semibold">{t("checkout.payment.secureMessage")}</span>
                   </div>
                 </div>
-              } />
+              )})}
             </div>
           )}
         </>

@@ -29,7 +29,10 @@ export default function AttributeFormModal({ open, onClose, mode = "create", ini
   const [editOptionInput, setEditOptionInput] = useState("");
   const optionInputRef = useRef(null);
 
-  useEffect(() => {
+  // Form reset/seed (render ke dauran adjust; locale change par reset nahi hota)
+  const [prevSeedDeps, setPrevSeedDeps] = useState({ open: undefined, isEdit, initialData: undefined, initialName: undefined });
+  if (prevSeedDeps.open !== open || prevSeedDeps.isEdit !== isEdit || prevSeedDeps.initialData !== initialData || prevSeedDeps.initialName !== initialName) {
+    setPrevSeedDeps({ open, isEdit, initialData, initialName });
     if (open) {
       if (isEdit && initialData) {
         const dataType = initialData.data_type || "multi_select";
@@ -96,7 +99,7 @@ export default function AttributeFormModal({ open, onClose, mode = "create", ini
         setEditOptionInput("");
       }
     }
-  }, [open, isEdit, initialData, initialName]);
+  }
 
   if (!open) return null;
 

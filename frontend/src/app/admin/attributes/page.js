@@ -755,7 +755,7 @@ export default function AttributesPage() {
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
   const inputStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
-  const SortHeader = ({ label, sortKey }) => (
+  const renderSortHeader = ({ label, sortKey }) => (
     <th className="px-4 py-3 text-left">
       <button onClick={() => { setAttributePage(1); setSortConfig(prev => ({ key: sortKey, direction: prev.key === sortKey && prev.direction === "asc" ? "desc" : "asc" })); }}
         className="inline-flex items-center gap-1 text-[12px] font-semibold uppercase tracking-wider transition hover:opacity-80"
@@ -765,7 +765,7 @@ export default function AttributesPage() {
     </th>
   );
 
-  const Pagination = ({ current, total, go, label, pageSize, totalRecords, onPageSizeChange }) => {
+  const renderPagination = ({ current, total, go, label, pageSize, totalRecords, onPageSizeChange }) => {
     if (totalRecords <= 0) return null;
     const pages = [];
     if (total <= 5) for (let i = 1; i <= total; i++) pages.push(i);
@@ -1046,10 +1046,10 @@ export default function AttributesPage() {
               <table className="w-full text-[13px]">
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                   <tr>
-                    <SortHeader label={t("table.name")} sortKey="name" />
-                    <SortHeader label={t("table.type")} sortKey="type" />
+                    {renderSortHeader({ label: t("table.name"), sortKey: "name" })}
+                    {renderSortHeader({ label: t("table.type"), sortKey: "type" })}
                     <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("table.category")}</th>
-                    <SortHeader label={t("table.optionsCount")} sortKey="options" />
+                    {renderSortHeader({ label: t("table.optionsCount"), sortKey: "options" })}
                     <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("table.status")}</th>
                     <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)", width: "52px" }}>{t("table.actions")}</th>
                   </tr>
@@ -1127,11 +1127,11 @@ export default function AttributesPage() {
           )}
         </div>
 
-        <Pagination current={attributePage} total={totalAttributePages} go={goToAttributePage}
-          pageSize={attributesPerPage}
-          totalRecords={totalAttributes}
-          onPageSizeChange={(size) => { setAttributesPerPage(size); setAttributePage(1); }}
-          label={totalAttributes > 0 ? `${t("table.showingRange", { start: attrStartIndex, end: attrEndIndex, total: totalAttributes })}` : t("table.empty")} />
+        {renderPagination({ current: attributePage, total: totalAttributePages, go: goToAttributePage,
+          pageSize: attributesPerPage,
+          totalRecords: totalAttributes,
+          onPageSizeChange: (size) => { setAttributesPerPage(size); setAttributePage(1); },
+          label: totalAttributes > 0 ? `${t("table.showingRange", { start: attrStartIndex, end: attrEndIndex, total: totalAttributes })}` : t("table.empty") })}
         </div>
 
       </div>

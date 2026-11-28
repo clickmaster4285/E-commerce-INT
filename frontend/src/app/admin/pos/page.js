@@ -489,10 +489,9 @@ export default function PosPage() {
   const brandOptions = productsPayload.filters?.brands || [];
   const totalPages = Math.max(1, Number(productsPayload.pagination?.totalPages) || 1);
 
-  useEffect(() => {
-    const safePage = Number(productsPayload.pagination?.page);
-    if (!productsPlaceholder && safePage && safePage !== currentPage) setCurrentPage(safePage);
-  }, [productsPayload.pagination?.page, currentPage, productsPlaceholder]);
+  // Server page se sync (render ke dauran adjust)
+  const posServerPage = Number(productsPayload.pagination?.page);
+  if (!productsPlaceholder && posServerPage && posServerPage !== currentPage) setCurrentPage(posServerPage);
 
   const customerResults = useQuery({
     queryKey: ["pos-customer-picker", debouncedCustomerSearch],

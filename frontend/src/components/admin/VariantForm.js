@@ -67,11 +67,13 @@ function SubAttributeSelect({ subAttribute, values, selectedValue, onChange }) {
   });
 
   // Sync when prop updates
-  useEffect(() => {
+  const [prevSubValues, setPrevSubValues] = useState(subAttribute?.values);
+  if (prevSubValues !== subAttribute?.values) {
+    setPrevSubValues(subAttribute?.values);
     if (subAttribute?.values && Array.isArray(subAttribute.values)) {
       setLocalValueObjects(subAttribute.values);
     }
-  }, [subAttribute?.values]);
+  }
 
   const valueObjects = localValueObjects;
 
@@ -460,17 +462,19 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
       finalVariants = [createEmptyVariant("")];
     }
 
-    setFormData({
-      category_id: product.category_id?._id || product.category_id || "",
-      brand_id: product.brand_id?._id || product.brand_id || "",
-      name: product.name || "",
-      description: product.description || "",
-      tax: String(product.tax ?? 0),
-      status: product.status || "active",
-      variants: finalVariants,
+    // microtask: effect body me sync setState nahi
+    queueMicrotask(() => {
+      setFormData({
+        category_id: product.category_id?._id || product.category_id || "",
+        brand_id: product.brand_id?._id || product.brand_id || "",
+        name: product.name || "",
+        description: product.description || "",
+        tax: String(product.tax ?? 0),
+        status: product.status || "active",
+        variants: finalVariants,
+      });
+      setInitialized(true);
     });
-
-    setInitialized(true);
 
     if (!isEditMode) {
       variantApi
@@ -491,6 +495,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
           toast.error(t("admin.productForm.skuFailed"));
         });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- i18n t identity
   }, [product, initialized, isEditMode, editVariantId]);
 
   // ----------------------------------------------------------------

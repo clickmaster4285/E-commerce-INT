@@ -232,11 +232,12 @@ function QuoteEditor({ quoteId, quote, customerId }) {
     return () => {
       active = false;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- i18n t identity; number sirf quoteId par generate ho
   }, [quoteId]);
   useEffect(() => {
     const defaultTerms = companySettings?.quote_terms_conditions || "";
     if (!quoteId && defaultTerms)
-      setForm((current) => ({ ...current, terms: defaultTerms }));
+      queueMicrotask(() => setForm((current) => ({ ...current, terms: defaultTerms })));
   }, [
     quoteId,
     locale,
@@ -283,7 +284,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
     if (!customerId || quoteId) return;
     const customer = prefilledCustomer;
     if (!customer) return;
-    setForm((current) => {
+    queueMicrotask(() => setForm((current) => {
       const next = {
         customer_type: "Customer",
         customer_key: `customer:${customer._id}`,
@@ -302,7 +303,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
       )
         return current;
       return { ...current, ...next };
-    });
+    }));
   }, [customerId, prefilledCustomer, quoteId]);
   const customerOptions = useMemo(() => {
     const query = customerSearch.trim().toLowerCase();

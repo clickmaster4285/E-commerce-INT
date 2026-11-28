@@ -25,7 +25,11 @@ const profileOptions = [
 
 function UserAvatar({ src, name, className = "", style }) {
   const [imageFailed, setImageFailed] = useState(false);
-  useEffect(() => setImageFailed(false), [src]);
+  const [prevSrc, setPrevSrc] = useState(src);
+  if (prevSrc !== src) {
+    setPrevSrc(src);
+    setImageFailed(false);
+  }
 
   const showAvatar = Boolean(src && !imageFailed);
   const initial = name?.trim()?.charAt(0)?.toUpperCase() || "U";
@@ -69,9 +73,13 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
   const [liveUser, setLiveUser] = useState(null);
 
   // ✅ FIX: Jab pathname change ho (login/logout) to liveUser reset karo
-  useEffect(() => {
+  // (render ke dauran adjust: liveUser aur dropdown dono pathname par reset)
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
     setLiveUser(null);
-  }, [pathname]);
+    setIsOpen(false);
+  }
 
   // ✅ Fetch live user data via socket — pathname dependency se login pe re-run hoga
   useEffect(() => {
@@ -132,6 +140,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
       socket.off("permissionsUpdated", handlePermissionsUpdated);
       socket.off("employeeUpdated", handleEmployeeUpdated);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- sirf pathname par re-subscribe
   }, [pathname]);
 
   // ✅ Merge: liveUser (socket) priority, fallback to userData (prop)
@@ -148,8 +157,6 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
-
-  useEffect(() => { setIsOpen(false); }, [pathname]);
 
   // ✅ FIXED LOGOUT FUNCTION - NO CONFIRMATION DIALOG
   const handleLogout = async () => {

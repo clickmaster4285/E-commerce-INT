@@ -62,11 +62,10 @@ export default function CustomersPage() {
   const startIndex = pagination.total > 0 ? (displayedPage - 1) * pagination.limit + 1 : 0;
   const endIndex = Math.min(displayedPage * pagination.limit, pagination.total);
 
-  useEffect(() => {
-    if (Number.isInteger(pagination.page) && pagination.page > 0 && pagination.page !== page) {
-      setPage(pagination.page);
-    }
-  }, [pagination.page, page]);
+  // Server page se sync (render ke dauran adjust; condition ke baad false ho jati hai)
+  if (Number.isInteger(pagination.page) && pagination.page > 0 && pagination.page !== page) {
+    setPage(pagination.page);
+  }
 
   const renderPageNumbers = () => {
     const pages = [];

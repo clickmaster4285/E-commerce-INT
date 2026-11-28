@@ -35,7 +35,7 @@ import FallbackImage from "@/components/common/FallbackImage";
 //   (`--bg-main`/`--accent`) or the storefront ones (`--user-bg`/`--user-accent`)
 //   — so the curtain never flashes the wrong colors.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 
 import { usePathname } from "next/navigation";
@@ -70,7 +70,7 @@ export default function LanguageTransition({
   onSwitch,
   onComplete,
 }) {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const [phase, setPhase] = useState("cover");
   const [logoFailed, setLogoFailed] = useState(false);
 
@@ -115,8 +115,6 @@ export default function LanguageTransition({
 
   // Lock the page behind the curtain, then run cover -> hold -> reveal once.
   useEffect(() => {
-    setMounted(true);
-
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
@@ -148,9 +146,11 @@ export default function LanguageTransition({
   }, []);
 
   // A new logo deserves a fresh attempt at rendering.
-  useEffect(() => {
+  const [prevLogoUrl, setPrevLogoUrl] = useState(logoUrl);
+  if (prevLogoUrl !== logoUrl) {
+    setPrevLogoUrl(logoUrl);
     setLogoFailed(false);
-  }, [logoUrl]);
+  }
 
   if (!mounted) return null;
 

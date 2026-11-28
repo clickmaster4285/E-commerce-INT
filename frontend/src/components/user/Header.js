@@ -295,13 +295,14 @@ export default function Header() {
 
   useEffect(() => {
     const saved = Cookies.get("user-theme") === "dark" ? "dark" : "light";
-    setTheme(saved);
+    // microtask: cookie hydrate, effect body me sync setState nahi
+    queueMicrotask(() => setTheme(saved));
     document.documentElement.classList.toggle("user-dark", saved === "dark");
   }, []);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
-    setIsMobile(mq.matches);
+    queueMicrotask(() => setIsMobile(mq.matches));
     const onChange = (e) => setIsMobile(e.matches);
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
@@ -416,6 +417,7 @@ export default function Header() {
     queryClient.removeQueries({ queryKey: ["userProfile"] });
     setProfileOpen(false);
     setOpen(false);
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- hard redirect: full reload se auth state/cookies reset
     window.location.href = "/";
   };
 

@@ -488,7 +488,7 @@ export default function OrderDetailPage({ params }) {
 
     // Har group ke saath "kyun lagi" wali explanation
     return Array.from(map.values()).map((g) => ({ ...g, description: promoReason(g, t, locale) }));
-  }, [order]);
+  }, [order, t, locale]);
 
   const dealGroups = promoGroups.filter((g) => g.kind === "deal");
   const bundleGroups = promoGroups.filter((g) => g.kind === "bundle");

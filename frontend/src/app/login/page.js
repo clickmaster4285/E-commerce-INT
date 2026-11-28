@@ -167,6 +167,7 @@ export default function UserLoginPage() {
     try {
       if (isLogin) {
         await authApi.login({ email, password });
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- hard redirect: full reload se auth state/cookies reset
         window.location.href = "/";
         return;
       }
@@ -198,6 +199,7 @@ export default function UserLoginPage() {
   const handleVerifyEmailOtp = async (otp) => {
     await authApi.verifyEmailOtp(otpEmail, otp);
     toast.success(t("auth.login.emailVerified"));
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- hard redirect: full reload se auth state/cookies reset
     window.location.href = "/";
   };
 
@@ -257,6 +259,7 @@ export default function UserLoginPage() {
     setLoading(true);
     try {
       await authApi.googleCustomerLogin(credential);
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- hard redirect: full reload se auth state/cookies reset
       window.location.href = "/";
     } catch (err) {
       toast.error(getApiErrorMessage(err, t("auth.login.googleFailed")));
