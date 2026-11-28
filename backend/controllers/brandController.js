@@ -463,17 +463,21 @@ const getBrandsAdmin = async (req, res) => {
 
     /* ---------- LEGACY: full list (with products) ---------- */
     if (!wantsPagination) {
+      // Legacy full list — hard-capped; prefer /brands/admin/options for dropdowns (§9.3)
+      const { legacyCap } = require("../utils/legacyListCap");
       const brands = await Brand.find({ is_deleted: false })
         .sort({ created_at: -1 })
-        .populate("createdby", "name email")
-        .populate("updatedby", "name email");
+        .limit(legacyCap(0, 50))
+        .lean();
 
       const brandsWithProducts = await Promise.all(
         brands.map(async (brand) => {
-          const products = await Product.find({ brand_id: brand._id })
-            .populate("category_id", "name translations")
-            .select("name brand_id category_id status created_at");
-          return { ...brand.toObject(), products };
+          const products = await Product.find({ brand_id: brand._id, is_deleted: { $ne: true } })
+            .populate("category_id", "name")
+            .select("name brand_id category_id status created_at")
+            .limit(20)
+            .lean();
+          return { ...brand, products };
         })
       );
       return res.status(200).json({ success: true, data: brandsWithProducts });
@@ -581,12 +585,47 @@ const getBrandsAdmin = async (req, res) => {
     res.status(400).json({ success: false, message: error.message });
   }
 };
+// Dropdown / picker — no N+1 product load (§9.3)
+const getBrandOptions = async (req, res) => {
+  try {
+    const requestedLocale = String(req.query.locale || "en").trim().toLowerCase();
+    const locale = /^[a-z]{2}$/.test(requestedLocale) ? requestedLocale : "en";
+    const search = String(req.query.search || "").trim();
+    const { legacyCap } = require("../utils/legacyListCap");
+    const limit = legacyCap(req.query.limit, 50);
+    const filter = { is_deleted: false, is_active: { $ne: false } };
+    if (search) {
+      const rx = new RegExp(escapeRegex(search), "i");
+      filter.$or = [{ name: rx }, { brand_code: rx }];
+    }
+    const brands = await Brand.find(filter)
+      .select("name brand_code translations.name")
+      .sort({ name: 1 })
+      .limit(limit)
+      .lean();
+    const data = brands.map((brand) => ({
+      _id: brand._id,
+      name: brand.name,
+      brand_code: brand.brand_code,
+      ...(locale !== "en" && {
+        translations: {
+          name: brand.translations?.name?.[locale] ? { [locale]: brand.translations.name[locale] } : {},
+        },
+      }),
+    }));
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || "Failed to fetch brand options" });
+  }
+};
+
 module.exports = {
   getNextBrandCode,
   createBrand,
   getBrands,
   getBrandsPublic,
   getBrandsAdmin,
+  getBrandOptions,
   getBrandById,
   getBrandWithProducts,
   updateBrand,

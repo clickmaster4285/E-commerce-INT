@@ -212,8 +212,17 @@ const getVendorWithPOs = async (req, res) => {
       .populate("updatedby", "name email")
       .lean();
     if (!vendor) return res.status(404).json({ success: false, message: "Vendor not found" });
-    const pos = await PurchaseOrder.find({ vendor_id: vendor._id, is_deleted: { $ne: true } }).sort({ created_at: -1 }).limit(100).lean();
-    const payments = await PurchasePayment.find({ vendor_id: vendor._id }).lean();
+    const pos = await PurchaseOrder.find({ vendor_id: vendor._id, is_deleted: { $ne: true } })
+      .select("po_number created_at total paid_amount status items._id activity receivings.invoice_no receivings.received_by_name receivings.received_at receivings.items.qty createdby")
+      .populate("createdby", "name")
+      .sort({ created_at: -1 })
+      .limit(50)
+      .lean();
+    const payments = await PurchasePayment.find({ vendor_id: vendor._id })
+      .select("amount method reference note po_id created_at")
+      .sort({ created_at: -1 })
+      .limit(100)
+      .lean();
     const totalPurchased = pos.reduce((s, p) => s + (Number(p.total) || 0), 0);
     const totalPaid = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
 
@@ -243,7 +252,7 @@ const getVendorWithPOs = async (req, res) => {
       ...(p.createdby && typeof p.createdby === "object"
         ? { createdby: { _id: p.createdby._id, name: p.createdby.name } }
         : {}),
-      activity: p.activity || [],
+      activity: (p.activity || []).slice(0, 20),
       receivings: (p.receivings || []).map((r) => ({
         invoice_no: r.invoice_no,
         received_by_name: r.received_by_name,
@@ -260,6 +269,15 @@ const getVendorWithPOs = async (req, res) => {
         total_paid: totalPaid,
         balance_payable: Math.max(0, totalPurchased - totalPaid),
         purchaseOrders: pos.map(slimPurchaseOrder),
+        payments: payments.map((pay) => ({
+          _id: pay._id,
+          amount: pay.amount,
+          method: pay.method,
+          reference: pay.reference,
+          note: pay.note,
+          po_id: pay.po_id,
+          created_at: pay.created_at,
+        })),
       },
     });
   } catch (e) { res.status(400).json({ success: false, message: e.message }); }

@@ -123,14 +123,22 @@ exports.listQuotes = async (req, res) => {
       if (req.query.dateTo) filter.quote_date.$lte = new Date(`${req.query.dateTo}T23:59:59.999Z`);
     }
 
+    const listFields = "_id quote_number customer_type customer_name customer_email customer_phone quote_date expiry_date total status created_at updated_at translations";
+    const locale = String(req.query.locale || "en").toLowerCase();
+    const localizeQuote = (quote) => {
+      const values = quote.translations?.customer_name;
+      const translated = values instanceof Map ? values.get(locale) : values?.[locale];
+      return { ...quote, translations: { customer_name: translated ? { [locale]: translated } : {} } };
+    };
+
     // Keep the unpaginated shape for callers outside the Quotes list (hard-capped §4.5).
     if (req.query.page === undefined) {
       const { legacyCap } = require("../utils/legacyListCap");
-      const quotes = await Quote.find(filter)
-        .select("_id quote_number customer_type customer_name customer_email customer_phone quote_date expiry_date total status created_at updated_at translations")
+      const quotes = (await Quote.find(filter)
+        .select(listFields)
         .sort({ created_at: -1, _id: -1 })
         .limit(legacyCap(0, 50))
-        .lean();
+        .lean()).map(localizeQuote);
       return res.json({ success: true, data: quotes });
     }
 
@@ -142,7 +150,7 @@ exports.listQuotes = async (req, res) => {
     const page = Math.min(requestedPage, pages);
     const [quotes, total, sent, accepted, rejected] = await Promise.all([
       Quote.find(filter)
-        .select("_id quote_number customer_type customer_name customer_email customer_phone quote_date expiry_date total status created_at updated_at translations")
+        .select(listFields)
         .sort({ created_at: -1, _id: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
@@ -154,7 +162,7 @@ exports.listQuotes = async (req, res) => {
     ]);
     return res.json({
       success: true,
-      data: quotes,
+      data: quotes.map(localizeQuote),
       stats: { total, sent, accepted, rejected },
       pagination: { total: filteredTotal, page, limit, pages, hasNext: page < pages, hasPrev: page > 1 },
     });

@@ -223,7 +223,7 @@ exports.listInvoices = async (req, res) => {
       if (req.query.dateTo) filter.invoice_date.$lte = new Date(`${req.query.dateTo}T23:59:59.999Z`);
     }
 
-    const listFields = "_id invoice_number customer_name customer_phone invoice_date due_date total status sent_at amount_paid remaining_balance translations translation_source translation_status";
+    const listFields = "_id invoice_number customer_name customer_phone invoice_date due_date total status sent_at amount_paid remaining_balance translations";
     // Legacy full-list for non-paginated callers — hard-capped + same filter (§4.5)
     if (req.query.page === undefined) {
       const { legacyCap } = require("../utils/legacyListCap");

@@ -188,11 +188,12 @@ const getPosSales = async (req, res) => {
       ]);
     }
     const sales = await PosSale.find(filter)
-      .select("sale_number customer_id customer_snapshot cashier_id cashier_name created_by_name items subtotal discount_amount tax_amount additional_tax_rate total payment status created_at edit_history notes")
+      .select("sale_number customer_id customer_snapshot cashier_id cashier_name created_by_name items.product_name items.quantity items.unit_price items.line_total items.product_image items.variant_title items.sku items.product_id items.variant_id subtotal discount_amount tax_amount additional_tax_rate total payment status created_at edit_history notes")
       .populate("customer_id", "name phone email")
-      .populate("cashier_id", "name email")
-      .populate("items.product_id", "name translations")
-      .populate("items.variant_id", "images quantity")
+      .populate("cashier_id", "name")
+      .populate("items.product_id", "name")
+      .populate("items.variant_id", "images.img_url quantity")
+      .slice("edit_history", -1)
       .sort({ created_at: -1 })
       .skip((safePage - 1) * limit)
       .limit(limit)
@@ -200,12 +201,21 @@ const getPosSales = async (req, res) => {
 
     const data = sales.map((sale) => ({
       ...sale,
-      edit_history: (sale.edit_history || []).slice(-1),
-      items: (sale.items || []).map((item) => {
+      edit_history: sale.edit_history || [],
+      // UI previews ~4 line items on the list card (§9.3)
+      items: (sale.items || []).slice(0, 4).map((item) => {
         const variant = item.variant_id && typeof item.variant_id === "object" ? item.variant_id : null;
+        const productName = item.product_name || item.product_id?.name || "";
         return {
-          ...item,
-          product_id: localizeProduct(item.product_id, locale),
+          product_name: productName,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          line_total: item.line_total,
+          sku: item.sku,
+          variant_title: item.variant_title,
+          product_id: item.product_id
+            ? { _id: item.product_id._id || item.product_id, name: item.product_id.name || productName }
+            : null,
           product_image: item.product_image || variant?.images?.[0]?.img_url || "",
           available_stock: variant ? Number(variant.quantity) || 0 : 0,
           variant_id: variant?._id || item.variant_id,

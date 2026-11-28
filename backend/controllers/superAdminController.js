@@ -694,6 +694,7 @@ const listStores = async (req, res) => {
 
     const [stores, total] = await Promise.all([
       Store.find(filter)
+        .select("store_name email phone subdomain city country address zip_code business_category business_type description logo.img_url planId store_status createdAt")
         .sort({ createdAt: -1 })
         .skip((pageNum - 1) * limitNum)
         .limit(limitNum)
@@ -1537,7 +1538,7 @@ const manageBlockReason = (target, me) => {
 };
 
 const ONLINE_WINDOW_MS = 5 * 60 * 1000;
-const publicMember = (m, me) => ({
+const publicMember = (m, me, { includeActivities = false } = {}) => ({
   id: m._id,
   name: m.name,
   email: m.email,
@@ -1553,7 +1554,10 @@ const publicMember = (m, me) => ({
   isSeed: isSeedAccount(m),
   isSelf: String(m._id) === String(me?._id),
   canManage: !manageBlockReason(m, me),
-  activities: Array.isArray(m.activities) ? m.activities.slice(0, 100) : [],
+  // List rows never render activities — only detail (§9.3)
+  ...(includeActivities
+    ? { activities: Array.isArray(m.activities) ? m.activities.slice(0, 100) : [] }
+    : {}),
 });
 
 const recordSuperAdminActivity = async (req, action, category = "System", details = {}) => {
@@ -1576,7 +1580,11 @@ const otherActiveSuperAdmins = (excludeId) =>
 const listTeam = async (req, res) => {
   try {
     // Team page = sirf staff. Super admin accounts (seeded) list me nahi aate.
-    const members = await SuperAdmin.find({ role: "staff" }).populate("createdBy", "name").sort({ created_at: -1 }).lean();
+    const members = await SuperAdmin.find({ role: "staff" })
+      .select("-activities -passwordHash")
+      .populate("createdBy", "name")
+      .sort({ created_at: -1 })
+      .lean();
     const counts = {
       all: members.length,
       active: members.filter((m) => m.status === "active").length,
@@ -1728,7 +1736,7 @@ const getTeamMember = async (req, res) => {
     const member = await SuperAdmin.findById(req.params.id).populate("createdBy", "name email").lean();
     if (!member) return res.status(404).json({ success: false, message: "Team member not found." });
     // Dekhna sab ko allowed hai — sirf badalna restricted (manageBlockReason)
-    return res.json({ success: true, data: { member: publicMember(member, req.superAdmin) } });
+    return res.json({ success: true, data: { member: publicMember(member, req.superAdmin, { includeActivities: true }) } });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to load the team member." });
   }

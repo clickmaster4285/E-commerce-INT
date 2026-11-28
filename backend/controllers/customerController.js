@@ -11,11 +11,7 @@ const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g
 
 const getCustomersAdmin = async (req, res) => {
   try {
-    const convertedLeads = await Lead.find({
-      status: { $in: ["Customer", "Converted"] },
-      is_deleted: { $ne: true },
-    });
-    for (const lead of convertedLeads) await syncLeadCustomer(lead, req.user?._id || null);
+    // No write-on-read syncLeadCustomer here (§3.6 / §9.3) — sync on convert/update only
 
     const search = String(req.query.search || "").trim();
     const baseFilter = { is_deleted: { $ne: true } };

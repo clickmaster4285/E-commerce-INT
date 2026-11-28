@@ -200,6 +200,7 @@ exports.listLeads = async (req, res) => {
     const activeLeads = { is_deleted: { $ne: true } };
     const [items, total, allLeads, newThisMonth, qualified, followUpsDue] = await Promise.all([
       Lead.find(filter)
+        .select("-activities -history -translation_source -translation_status -createdby -updatedby -is_deleted -deleted_at")
         .populate("assigned_employee_id", "name")
         .populate("category_id", "name")
         .sort({ [sortField]: sortOrder, _id: 1 })

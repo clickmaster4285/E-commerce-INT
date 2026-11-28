@@ -37,20 +37,29 @@ async function getOrCreateTheme() {
   }
 }
 
-const adminView = (doc) => ({
-  draft: doc.draft || buildDefaultTheme(),
-  published: doc.published || buildDefaultTheme(),
-  draftRevision: doc.draftRevision,
-  publishedVersion: doc.publishedVersion,
-  draftUpdatedAt: doc.draftUpdatedAt,
-  publishedAt: doc.publishedAt,
-  hasUnpublishedChanges: JSON.stringify(doc.draft) !== JSON.stringify(doc.published),
-  scheduled: doc.scheduled?.at ? { at: doc.scheduled.at, note: doc.scheduled.note || "", createdAt: doc.scheduled.createdAt } : null,
-  lastScheduleError: doc.lastScheduleError || null,
-  previewLinks: (doc.previewLinks || [])
-    .filter((l) => new Date(l.expiresAt).getTime() > Date.now())
-    .map((l) => ({ id: String(l._id), expiresAt: l.expiresAt, createdAt: l.createdAt })),
-});
+const themeHash = (value) => crypto.createHash("sha1").update(JSON.stringify(value || null)).digest("hex");
+
+const adminView = (doc) => {
+  const draft = doc.draft || buildDefaultTheme();
+  const published = doc.published || buildDefaultTheme();
+  const draft_hash = themeHash(draft);
+  const published_hash = themeHash(published);
+  return {
+    draft,
+    published,
+    draftRevision: doc.draftRevision,
+    publishedVersion: doc.publishedVersion,
+    draftUpdatedAt: doc.draftUpdatedAt,
+    publishedAt: doc.publishedAt,
+    draft_hash,
+    hasUnpublishedChanges: draft_hash !== published_hash,
+    scheduled: doc.scheduled?.at ? { at: doc.scheduled.at, note: doc.scheduled.note || "", createdAt: doc.scheduled.createdAt } : null,
+    lastScheduleError: doc.lastScheduleError || null,
+    previewLinks: (doc.previewLinks || [])
+      .filter((l) => new Date(l.expiresAt).getTime() > Date.now())
+      .map((l) => ({ id: String(l._id), expiresAt: l.expiresAt, createdAt: l.createdAt })),
+  };
+};
 
 const emitTheme = (req, event, payload) => {
   try {
@@ -130,7 +139,11 @@ exports.saveDraft = async (req, res) => {
         currentRevision: current?.draftRevision ?? null,
       });
     }
-    return res.status(200).json({ success: true, data: { draftRevision: doc.draftRevision, draft: doc.draft } });
+    // Editor already has the draft locally — echo revision only (§9.3)
+    return res.status(200).json({
+      success: true,
+      data: { draftRevision: doc.draftRevision, draftUpdatedAt: doc.draftUpdatedAt },
+    });
   } catch (error) {
     return fail(res, 500, "Failed to save draft");
   }

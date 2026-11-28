@@ -215,7 +215,7 @@ const getAllPOs = async (req, res) => {
 
     const [pos, total] = await Promise.all([
       PurchaseOrder.find(q).select("po_number vendor_id vendor_snapshot status payment_status total expected_date created_at items.qty_ordered items.received_qty")
-        .populate("vendor_id", "name vendor_code is_active company_name phone email address city translations")
+        .populate("vendor_id", "name vendor_code translations.name")
         .sort({ [sortField]: sortOrder, _id: 1 })
         .skip((page - 1) * limit).limit(limit).lean(),
       PurchaseOrder.countDocuments(q),
