@@ -206,6 +206,4 @@ module.exports = {
   sendApplicationApprovedEmail,
   sendApplicationRejectedEmail,
   sendApplicationInfoRequestedEmail,
-  templatesAvailable: true,
-  smtpConfigured: () => isSmtpConfigured(),
 };

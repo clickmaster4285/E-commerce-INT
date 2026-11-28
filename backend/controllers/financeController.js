@@ -27,15 +27,6 @@ const parseFinanceLocale = (value) => {
   const requestedLocale = String(value || "en").trim().toLowerCase();
   return /^[a-z]{2}$/.test(requestedLocale) ? requestedLocale : "en";
 };
-const FINANCE_SORT_FIELDS = {
-  date: "date",
-  reference: "reference",
-  title: "title",
-  category: "category",
-  amount: "amount",
-  status: "status",
-};
-
 function getDateRange(period, startDateValue, endDateValue) {
   const now = new Date();
   const start = new Date(now);

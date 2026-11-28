@@ -68,8 +68,7 @@ vendorSchema.index(
   { storeId: 1, vendor_code: 1 },
   { unique: true, partialFilterExpression: { is_deleted: false } },
 );
-vendorSchema.index({ name: 1, is_deleted: 1 });
-vendorSchema.index({ city: 1, is_deleted: 1 });
+vendorSchema.index({ storeId: 1, is_deleted: 1, name: 1 });
 
 vendorSchema.statics.findActive = function (filter = {}) {
   return this.find({ ...filter, is_deleted: false });

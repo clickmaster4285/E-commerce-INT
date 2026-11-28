@@ -20,7 +20,7 @@ const quoteItemSchema = new mongoose.Schema({
 }, { _id: true });
 
 const quoteSchema = new mongoose.Schema({
-  quote_number: { type: String, required: true, trim: true, index: true },
+  quote_number: { type: String, required: true, trim: true },
   customer_type: { type: String, enum: ["Customer", "Lead", "Other"], default: "Other" },
   customer_id: { type: mongoose.Schema.Types.ObjectId, default: null },
   lead_id: { type: mongoose.Schema.Types.ObjectId, ref: "Lead", default: null },
@@ -46,15 +46,12 @@ const quoteSchema = new mongoose.Schema({
   terms: { type: String, trim: true, default: "", maxlength: 5000 },
   notes: { type: String, trim: true, default: "", maxlength: 1000 },
   pdf_design: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
-  status: { type: String, enum: ["Pending", "Draft", "Sent", "Accepted", "Rejected"], default: "Pending", index: true },
+  status: { type: String, enum: ["Pending", "Draft", "Sent", "Accepted", "Rejected"], default: "Pending" },
   createdby: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
   updatedby: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
   activity: { type: [activitySchema], default: [] },
-  is_deleted: { type: Boolean, default: false, index: true },
+  is_deleted: { type: Boolean, default: false },
 }, { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } });
-
-quoteSchema.index({ status: 1, created_at: -1 });
-quoteSchema.index({ customer_name: 1 });
 
 const quoteNumberReservationSchema = new mongoose.Schema({
   token: { type: String, required: true, unique: true, index: true },
@@ -71,6 +68,8 @@ quoteNumberReservationSchema.index({ expires_at: 1 }, { expireAfterSeconds: 0 })
 quoteSchema.plugin(tenantScope); // har store ka data alag (storeId)
 quoteNumberReservationSchema.plugin(tenantScope); // har store ka data alag (storeId)
 quoteSchema.index({ storeId: 1, quote_number: 1 }, { unique: true }); // unique per store
+quoteSchema.index({ storeId: 1, is_deleted: 1, status: 1, created_at: -1 });
+quoteSchema.index({ storeId: 1, customer_id: 1 });
 quoteNumberReservationSchema.index({ storeId: 1, quote_number: 1 }, { unique: true }); // unique per store
 
 const Quote = mongoose.models.Quote || mongoose.model("Quote", quoteSchema);

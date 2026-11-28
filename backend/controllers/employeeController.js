@@ -4,6 +4,11 @@ const User = require("../models/User");
 const Employee = require("../models/Employee");
 const { validatePhone } = require("../utils/phoneValidator");
 const log = require("../utils/logger");
+const { nextSeq, formatNumber, maxNumericSuffix } = require("../utils/counter");
+
+const employeeCodeSeed = () => maxNumericSuffix(Employee, "employeeCode", /^EMP-\d+$/);
+const nextEmployeeCode = async () =>
+  formatNumber("EMP-", await nextSeq("employee", { seed: employeeCodeSeed }), 5);
 
 // =====================================================
 // ACTIVITY HELPER
@@ -479,8 +484,6 @@ exports.createEmployee = async (req, res) => {
       ? `${autoUsername}_${Math.random().toString(36).substring(2, 6)}`
       : autoUsername;
 
-    const count = await Employee.countDocuments({});
-
     // ✅ Naye employee ko default store se link karo
     // taake uski profile me store name / address blank na aaye
     // Current store host only — pehle Store.findOne() bina context ke kisi bhi store
@@ -489,6 +492,8 @@ exports.createEmployee = async (req, res) => {
     if (!defaultStoreId) {
       return res.status(400).json({ success: false, message: "Store context is required to create an employee." });
     }
+
+    const employeeCode = await nextEmployeeCode();
 
     const newEmployee = await Employee.create({
       name,
@@ -501,7 +506,7 @@ exports.createEmployee = async (req, res) => {
       avatar: avatar || "",
       permissions: fixPermissions(permissions || {}),
       preferences: preferences || { darkMode: true, notifications: { email: true, push: true, weekly: true } },
-      employeeCode: `EMP-${String(count + 1).padStart(5, "0")}`,
+      employeeCode,
       department: department || "",
       storeId: defaultStoreId,
       createdby: performerId,
@@ -826,19 +831,6 @@ exports.deleteEmployee = async (
     employee.updatedby = performerId;
 
     await employee.save();
-
-    if (employee.userId) {
-      await User.findByIdAndUpdate(
-        employee.userId,
-        {
-          $set: {
-            is_deleted: true,
-            deleted_at: new Date(),
-            deletedby: performerId,
-          },
-        }
-      );
-    }
 
     if (req.io) {
       req.io.emit(

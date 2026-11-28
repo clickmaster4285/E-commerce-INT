@@ -93,7 +93,7 @@ const purchaseOrderSchema = new mongoose.Schema(
       cancel_reason: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
     },
     receivings: { type: [receivingSchema], default: [] },
-    is_deleted: { type: Boolean, default: false, index: true },
+    is_deleted: { type: Boolean, default: false },
     deleted_at: { type: Date, default: null },
     createdby: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
     updatedby: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
@@ -102,12 +102,11 @@ const purchaseOrderSchema = new mongoose.Schema(
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );
 
-purchaseOrderSchema.index({ vendor_id: 1, status: 1, created_at: -1 });
-purchaseOrderSchema.index({ status: 1, created_at: -1 });
-
-
 // ── Multi-tenant ──
 purchaseOrderSchema.plugin(tenantScope); // har store ka data alag (storeId)
 purchaseOrderSchema.index({ storeId: 1, po_number: 1 }, { unique: true }); // unique per store
+purchaseOrderSchema.index({ storeId: 1, is_deleted: 1, status: 1, created_at: -1 });
+purchaseOrderSchema.index({ storeId: 1, vendor_id: 1, created_at: -1 });
+purchaseOrderSchema.index({ storeId: 1, "items.product_id": 1 });
 
 module.exports = mongoose.model("PurchaseOrder", purchaseOrderSchema);

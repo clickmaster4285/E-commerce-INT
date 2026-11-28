@@ -15,7 +15,6 @@ const pendingRegistrationSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      index: true,
     },
     name: { type: String, required: true, trim: true },
     username: { type: String, required: true, trim: true },
@@ -48,5 +47,7 @@ const pendingRegistrationSchema = new mongoose.Schema(
 
 // ✅ TTL — expiresAt ke baad MongoDB khud document delete kar dega
 pendingRegistrationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+pendingRegistrationSchema.index({ username: 1 });
+pendingRegistrationSchema.index({ phone: 1 });
 
 module.exports = mongoose.model("PendingRegistration", pendingRegistrationSchema);

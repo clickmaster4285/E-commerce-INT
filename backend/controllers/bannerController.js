@@ -1,6 +1,5 @@
 const Banner = require("../models/Banner");
 const fs = require("fs");
-const path = require("path");
 const { uploadUrlFor, localPathForUrl } = require("../utils/uploadPaths");
 const { getIO } = require("../utils/socket");
 const { withoutProtected } = require("../utils/sanitizeBody"); // mass assignment guard
@@ -74,9 +73,10 @@ const frontBannerFields = (banner) => ({
   ...(banner.description && { description: banner.description }),
   ...(banner.primaryButton && Object.keys(banner.primaryButton).length > 0 && { primaryButton: banner.primaryButton }),
   ...(banner.secondaryButton?.text && { secondaryButton: banner.secondaryButton }),
-  ...(Array.isArray(banner.displayRules) && banner.displayRules.length > 0 && { displayRules: banner.displayRules }),
-  ...(banner.autoPublish !== undefined && { autoPublish: banner.autoPublish }),
-  ...(banner.linkedDealId && { linkedDealId: banner.linkedDealId }),
+  ...(banner.displayRules &&
+    typeof banner.displayRules === "object" &&
+    !Array.isArray(banner.displayRules) &&
+    Object.keys(banner.displayRules).length > 0 && { displayRules: banner.displayRules }),
 });
 
 // ==========================================
@@ -88,7 +88,7 @@ exports.getBanner = async (req, res) => {
   try {
     const locale = parseLocale(req.query.locale);
     const banner = await Banner.findById(req.params.id)
-      .select("title translations bannerType status position startDate endDate eyebrow heading description altText backgroundColor primaryButton secondaryButton displayRules autoPublish linkedDealId desktopImage tabletImage mobileImage createdAt updatedAt createdby updatedby")
+      .select("title translations bannerType status position startDate endDate eyebrow heading description altText backgroundColor primaryButton secondaryButton displayRules desktopImage tabletImage mobileImage createdAt updatedAt createdby updatedby")
       .populate("createdby", "name email")
       .populate("updatedby", "name email")
       .lean();

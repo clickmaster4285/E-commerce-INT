@@ -848,67 +848,6 @@ const changePassword = async (req, res) => {
   }
 };
 
-const getProfileInfo = async (req, res) => {
-  try {
-    const userId = req.user?._id || req.user?.id;
-    if (!userId || userId === "guest")
-      return res.status(401).json({ success: false, message: "Unauthorized" });
-    const userType = req.userType || 'user';
-    const Model = userType === 'employee' ? Employee : User;
-    const user = await Model.findById(userId)
-      .select("-password -activities")
-      .populate("storeId");
-    if (!user)
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-    // Employee ka storeId null ho to current store host (cross-store fallback hata diya)
-    let store = user.storeId && user.storeId.store_name ? user.storeId : null;
-    if (!store) {
-      try {
-        store = user.storeId?._id
-          ? await Store.findById(user.storeId._id).lean()
-          : (req.store ? await Store.findById(req.store._id).lean() : null);
-      } catch (e) { /* ignore */ }
-      if (!store) store = req.store || user.storeId || {};
-    }
-    const profileData = {
-      _id: user._id,
-      name: user.name,
-      username: user.username,
-      email: user.email || store.email || "",
-      phone: user.phone || store.phone || "",
-      role: user.role,
-      status: user.status || (user.is_deleted ? "Inactive" : "Active"),
-      avatar: user.avatar || null,
-      created_at: user.created_at,
-      website: user.website || store.website || "",
-      address: user.address || store.address || "",
-      permissions: user.permissions || {
-        dashboard: true, products: true, brands: true, categories: true,
-        employees: true, discounts: true, deals: true, banners: true,
-        manageStock: true, shipping: true, order: true, attribute: true,
-        profile: true, store: true, bundles: true
-      },
-      preferences: user.preferences || {
-        darkMode: true,
-        notifications: { email: true, push: true, weekly: true },
-      },
-      store,
-      store_name: store.store_name || "",
-      stats: {
-        logins: user.loginCount || 0,
-        roles: 1,
-        sessions: user.sessionCount || 0,
-      },
-    };
-    return res.json({ success: true, data: profileData, user: profileData });
-  } catch (error) {
-    log.error("❌ Get Profile Info Error:", error);
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
-
 const updateProfileInfo = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
@@ -1590,18 +1529,6 @@ const deleteCheckoutDraft = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-const updateProfileREST = async (req, res) => {
-  try {
-    const { name, username } = req.body;
-    const update = {};
-    if (name) update.name = name;
-    if (username) update.username = username;
-    const Model = req.userType === "employee" ? Employee : User;
-    const user = await Model.findByIdAndUpdate(req.user._id, update, { returnDocument: "after" }).select("-password");
-    res.json({ success: true, user });
-  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
-};
-
 const changePasswordREST = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -1703,10 +1630,8 @@ module.exports = {
   getMe,
   updateProfile,
   changePassword,
-  getProfileInfo,
   updateProfileInfo,
   changePasswordSocket,
-  updateProfileREST,
   changePasswordREST,
   googleLogin,
   googleCustomerLogin,

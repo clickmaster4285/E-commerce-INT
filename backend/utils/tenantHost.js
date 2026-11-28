@@ -86,9 +86,8 @@ function validateSubdomain(sub) {
   return null;
 }
 
-/* Naye store address (signup / Add store) ki product limit — DNS label 63 tak allow karta hai,
+/* Naye store address (signup / Add store) ki length limit — DNS label 63 tak allow karta hai,
    lekin customers ke type/yaad rakhne ke liye 3–30 rakha hai. Purane lambe addresses chalte rahte hain. */
-const STORE_ADDRESS_MIN = 3;
 const STORE_ADDRESS_MAX = 30;
 /** @returns {string|null} — naye store address ke liye (format + reserved + length 3–30) */
 function validateStoreAddress(sub) {
@@ -113,7 +112,6 @@ module.exports = {
   slugifySubdomain,
   validateSubdomain,
   validateStoreAddress,
-  STORE_ADDRESS_MIN,
   STORE_ADDRESS_MAX,
   isPlatformFamilyHost,
 };

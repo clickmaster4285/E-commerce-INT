@@ -111,6 +111,8 @@ const stockHistorySchema = new mongoose.Schema(
 
 // ── Multi-tenant ──
 stockHistorySchema.plugin(tenantScope); // har store ka data alag (storeId)
+stockHistorySchema.index({ storeId: 1, created_at: -1, _id: -1 });
+stockHistorySchema.index({ storeId: 1, variant_id: 1, created_at: -1 });
 
 module.exports = mongoose.model(
   "StockHistory",

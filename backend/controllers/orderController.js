@@ -7,12 +7,10 @@ const Address = require("../models/Address");
 const Discount = require("../models/Discount");
 const Deal = require("../models/Deal");
 const Bundle = require("../models/Bundle");
-const discountController = require("./discountController");
 const log = require("../utils/logger");
 const { nextSeq, ensureSeeded, formatNumber, maxNumericSuffix } = require("../utils/counter");
 const { priceCheckout } = require("../services/pricing/checkout"); // server-side cart pricing
 const { withTx, TxAbort } = require("../utils/tx"); // one transaction per checkout
-const calculateDiscountedPrice = discountController.calculateDiscountedPrice;
 
 const emitOrderEvent = (event, data) => {
   try {
@@ -26,8 +24,6 @@ const emitOrderEvent = (event, data) => {
 const emitStockEvent = (data) => {
   emitOrderEvent("stockUpdated", data);
 };
-
-const DELIVERY_FEE = 200;
 
 /// ==========================================
 // POST /api/orders — Place Order

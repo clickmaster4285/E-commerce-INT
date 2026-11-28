@@ -26,8 +26,7 @@ const categorySchema = new mongoose.Schema(
     tenant_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Tenant",
-      required: false, 
-      index: true,
+      required: false,
     },
 
     category_code: {
@@ -102,12 +101,8 @@ categorySchema.index(
   { unique: true, partialFilterExpression: { is_deleted: false } },
 );
 
-// ✅ UPDATED: General search index without mandatory tenant filter
-categorySchema.index({
-  name: 1,
-  parent_category_id: 1,
-  is_deleted: 1,
-});
+categorySchema.index({ storeId: 1, parent_category_id: 1, is_deleted: 1 });
+categorySchema.index({ storeId: 1, "attributes.attribute_id": 1 });
 
 
 // ── Multi-tenant ──

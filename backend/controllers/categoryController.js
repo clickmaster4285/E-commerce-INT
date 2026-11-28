@@ -5,7 +5,7 @@ const Category = require("../models/Category");
 const Attribute = require("../models/Attribute");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
-const { getNextCategoryCode } = require("../utils/categoryCodeHelper");
+const { getNextCategoryCode, peekNextCategoryCode } = require("../utils/categoryCodeHelper");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 const { queueTranslationSync } = require("../utils/translationService");
@@ -96,8 +96,6 @@ const resolveCreatorInfo = async (rawId) => {
     return null;
   }
 };
-
-// ❌ REMOVED: getTenantId helper function
 
 const emitSocketEvent = (event, data) => {
   try {
@@ -425,7 +423,8 @@ const getCategoryAttributesHierarchy = async (categoryId) => {
 
 const getNextCode = async (req, res) => {
   try {
-    const nextCode = await getNextCategoryCode();
+    // Preview only — createCategory calls getNextCategoryCode() when assigning.
+    const nextCode = await peekNextCategoryCode();
     res.status(200).json({ success: true, nextCode });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -434,7 +433,6 @@ const getNextCode = async (req, res) => {
 
 const createCategory = async (req, res) => {
   try {
-    // ❌ REMOVED: const tenantId = getTenantId(req);
 
     const {
       name,
@@ -473,7 +471,6 @@ const createCategory = async (req, res) => {
     }
 
     const category = await Category.create({
-      // tenant_id: tenantId, //  REMOVED
       category_code: categoryCode,
       name: name.trim(),
       description: description.trim(),
@@ -517,7 +514,6 @@ const createCategory = async (req, res) => {
 
 const getCategories = async (req, res) => {
   try {
-    // ❌ REMOVED: const tenantId = getTenantId(req);
 
     const { legacyCap } = require("../utils/legacyListCap");
     const categories = await Category.find({ is_deleted: false })
@@ -720,7 +716,6 @@ const updateCategory = async (req, res) => {
 // ... (baaki functions same rahenge)
 const getCategoryAttributes = async (req, res) => {
   try {
-    // ❌ REMOVED: const tenantId = getTenantId(req);
     
     // ✅ FIX: Get attributes globally
     const locale = getRequestedLocale(req.query.locale);
@@ -758,7 +753,6 @@ const getCategoryAttributesHierarchical = async (req, res) => {
 
 const assignCategoryAttributes = async (req, res) => {
   try {
-    // ❌ REMOVED: const tenantId = getTenantId(req);
 
     // ✅ FIX: Find by ID globally
     const category = await Category.findOne({
@@ -806,7 +800,6 @@ const assignCategoryAttributes = async (req, res) => {
 
 const deleteCategory = async (req, res) => {
   try {
-    // ❌ REMOVED: const tenantId = getTenantId(req);
 
     // ✅ FIX: Find by ID globally
     const category = await Category.findOne({

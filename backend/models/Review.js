@@ -33,13 +33,11 @@ const reviewSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",
       required: true,
-      index: true,
     },
     user_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true,
     },
     rating: { type: Number, required: true, min: 1, max: 5 },
     title: { type: String, trim: true, default: "" },
@@ -97,12 +95,15 @@ const reviewSchema = new mongoose.Schema(
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } },
 );
 
-// ✅ One active review per user per product (repeat POST returns 409, use PUT to edit)
-reviewSchema.index({ product_id: 1, user_id: 1 }, { unique: true });
-reviewSchema.index({ product_id: 1, status: 1, is_deleted: 1, created_at: -1 });
-
+// ✅ One active review per user per product — soft-delete ke baad dobara post ho sake
+reviewSchema.index(
+  { product_id: 1, user_id: 1 },
+  { unique: true, partialFilterExpression: { is_deleted: false } },
+);
 
 // ── Multi-tenant ──
 reviewSchema.plugin(tenantScope); // har store ka data alag (storeId)
+reviewSchema.index({ storeId: 1, is_deleted: 1, created_at: -1 });
+reviewSchema.index({ storeId: 1, user_id: 1, created_at: -1 });
 
 module.exports = mongoose.model("Review", reviewSchema);

@@ -62,35 +62,8 @@ const staffPermissionCheck = (req, res, next) => {
   });
 };
 
-// ✅ Admin OR any-permission gate
-const adminMiddleware = (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({
-      success: false,
-      message: "Authentication failed. User not found.",
-    });
-  }
-
-  if (isAdminRole(req.user.role)) {
-    return next();
-  }
-
-  const permissions = req.user.permissions || {};
-  const hasAnyPermission = Object.values(permissions).some((val) => val === true);
-
-  if (!hasAnyPermission) {
-    return res.status(403).json({
-      success: false,
-      message: "Access Denied! You have no permissions enabled. Please contact your admin.",
-    });
-  }
-
-  next();
-};
-
 module.exports = {
   checkPermission,
   staffPermissionCheck,
-  adminMiddleware,
   requirePermission: checkPermission, // Backward compatibility
 };

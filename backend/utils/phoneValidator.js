@@ -61,33 +61,11 @@ const validatePhone = (phone, options = {}) => {
   return { valid: true, sanitized, message: "" };
 };
 
-/**
- * Express-style middleware for validating phone in req.body
- * @param {string} fieldName - Field name in req.body (default: "phone")
- */
-const validatePhoneField = (fieldName = "phone") => {
-  return (req, res, next) => {
-    const value = req.body[fieldName];
-    if (value === undefined || value === null || value === "") {
-      return next();
-    }
-
-    const result = validatePhone(value);
-    if (!result.valid) {
-      return res.status(400).json({ success: false, message: result.message });
-    }
-
-    req.body[fieldName] = result.sanitized;
-    next();
-  };
-};
-
 module.exports = {
   sanitizePhone,
   normalizePhone,
   isValidPhone,
   validatePhone,
-  validatePhoneField,
   PHONE_MIN_LENGTH,
   PHONE_MAX_LENGTH,
 };

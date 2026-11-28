@@ -151,12 +151,14 @@ const employeeSchema = new mongoose.Schema(
   }
 );
 
-employeeSchema.index({ "activities.timestamp": -1 });
 employeeSchema.index({ storeId: 1, department: 1 });
+employeeSchema.index({ storeId: 1, role: 1 });
 // Per-store unique (purane global unique indexes migrateTenantIndexes.js hatata hai)
 employeeSchema.index({ storeId: 1, email: 1 }, { unique: true });
 employeeSchema.index({ storeId: 1, username: 1 }, { unique: true });
-// Platform login (seller owner by email, saare stores)
+// Platform-wide login checks (seller ownership, duplicate phone)
+employeeSchema.index({ username: 1 });
+employeeSchema.index({ phone: 1 });
 employeeSchema.index({ email: 1 });
 
 

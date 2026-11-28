@@ -68,5 +68,10 @@ userSchema.methods.softDelete = function (userId) {
 userSchema.plugin(tenantScope); // har store ka data alag (storeId)
 userSchema.index({ storeId: 1, username: 1 }, { unique: true }); // unique per store
 userSchema.index({ storeId: 1, email: 1 }, { unique: true }); // unique per store
+userSchema.index({ storeId: 1, phone: 1 });
+userSchema.index({ storeId: 1, google_id: 1 }, { sparse: true });
+userSchema.index({ storeId: 1, created_at: -1 });
+// Platform seller accounts (storeId null) — super admin list sort
+userSchema.index({ created_at: -1 });
 
 module.exports = mongoose.model("User", userSchema);

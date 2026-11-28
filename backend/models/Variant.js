@@ -137,7 +137,7 @@ const variantSchema = new mongoose.Schema(
     },
     // Soft-delete (optimizeplan.md §2.5) — pehle field missing thi, is liye
     // is_deleted:{$ne:true} filters kuch nahi karti thin.
-    is_deleted: { type: Boolean, default: false, index: true },
+    is_deleted: { type: Boolean, default: false },
     deleted_at: { type: Date, default: null },
   },
   {
@@ -148,15 +148,16 @@ const variantSchema = new mongoose.Schema(
   }
 );
 
-// ✅ Shop facets (price/stock) + price sort: pehle variant + stock sums
-// isi index se serve hote hain. `_id` tail is liye taake variantStatsMap
-// wala { created_at: 1, _id: 1 } sort bhi index se aaye (in-memory
-// filesort nahi) — $first hamesha deterministic rehta hai.
-variantSchema.index({ product_id: 1, is_deleted: 1, created_at: 1, _id: 1 });
+// ✅ Shop facets + variant list — store-scoped compound (§3.3)
+variantSchema.index({ storeId: 1, product_id: 1, is_deleted: 1, created_at: 1, _id: 1 });
 
 
 // ── Multi-tenant ──
 variantSchema.plugin(tenantScope); // har store ka data alag (storeId)
-variantSchema.index({ storeId: 1, sku: 1 }, { unique: true }); // unique per store
+// Case-insensitive SKU per store (collation strength 2)
+variantSchema.index(
+  { storeId: 1, sku: 1 },
+  { unique: true, collation: { locale: "en", strength: 2 } },
+);
 
 module.exports = mongoose.model("Variant", variantSchema);

@@ -73,12 +73,10 @@ const customerSchema = new mongoose.Schema(
   }
 );
 
-customerSchema.index({ name: 1, phone: 1 });
-customerSchema.index({ phone: 1 });
-customerSchema.index({ email: 1 });
-
-
 // ── Multi-tenant ──
 customerSchema.plugin(tenantScope); // har store ka data alag (storeId)
+customerSchema.index({ storeId: 1, is_deleted: 1, created_at: -1 });
+customerSchema.index({ storeId: 1, phone: 1 });
+customerSchema.index({ storeId: 1, email: 1 });
 
 module.exports = mongoose.model("Customer", customerSchema);

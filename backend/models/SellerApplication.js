@@ -11,7 +11,6 @@ const sellerApplicationSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      index: true,
     },
     phone: { type: String, default: "", trim: true },
     username: { type: String, trim: true, default: "" },
@@ -55,7 +54,6 @@ const sellerApplicationSchema = new mongoose.Schema(
       type: String,
       enum: ["pending", "approved", "rejected"],
       default: "pending",
-      index: true,
     },
     rejection_reason: { type: String, default: "", trim: true },
     reviewed_by: { type: mongoose.Schema.Types.ObjectId, ref: "SuperAdmin", default: null },
@@ -67,6 +65,9 @@ const sellerApplicationSchema = new mongoose.Schema(
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );
 
+sellerApplicationSchema.index({ username: 1 });
+sellerApplicationSchema.index({ phone: 1 });
+sellerApplicationSchema.index({ status: 1, created_at: -1 });
 sellerApplicationSchema.index({ created_at: -1 });
 sellerApplicationSchema.index({ store_id: 1 });
 sellerApplicationSchema.index({ user_id: 1 });

@@ -867,7 +867,7 @@ const getProducts = async (req, res) => {
     // Keep this opt-in projection separate from other product list consumers.
     if (brandDetailList) {
       const products = await Product.find(filter)
-        .select("name product_code sku description status category_id translations")
+        .select("name description status category_id translations")
         .populate("category_id", "name translations")
         .sort(PRODUCT_LIST_SORT)
         .lean();
@@ -878,8 +878,6 @@ const getProducts = async (req, res) => {
         return {
           _id: product._id,
           name: product.name,
-          product_code: product.product_code,
-          sku: product.sku,
           description: product.description,
           status: product.status,
           ...(brandLocale !== "en" && {
@@ -2274,23 +2272,7 @@ const updateProduct = async (req, res) => {
         });
       }
 
-      // ⚠️ REMOVED (bug fix): Pehle yahan "jo variants payload mein nahi aaye unhe
-      // is_deleted = true karke save kar do" wala soft-delete loop tha. Variant
-      // model mein `is_deleted` / `deleted_at` fields maujood hi nahi hain, is liye:
-      //   • variant delete hota kuch bhi nahi tha (is_deleted silently ignore),
-      //   • magar `deletedby` (jo schema mein hai) mark modified ho jata tha aur
-      //     save() har bache hue variant ka `updated_at` bump kar deta tha —
-      //     nateeja: Activity timeline mein un variants ka ghalat "Variant Updated"
-      //     event, aur live variant par dangling `deletedby` audit value.
-      // (Add/Edit variant page sirf apna variant bhejta hai, is liye ye loop har
-      // baar baaki sab variants ko "delete" karne ki koshish karta tha.)
-      // Variant delete karne ka official rasta: DELETE /variants/:id
-      // (frontend: variantApi.delete) — wo hard delete karta hai aur images bhi
-      // remove karta hai.
-      // NOTE: Future mein agar soft-delete chahiye to pehle Variant schema mein
-      // is_deleted/deleted_at add karo aur add-variant page ko saare variants
-      // (purane + naya) bhejne ke liye update karo, warna baaki variants delete
-      // ho jayenge.
+      // Variant soft-delete loop yahan nahi — official delete: DELETE /variants/:id
     }
 
     const updatedVariants = await Variant.find({

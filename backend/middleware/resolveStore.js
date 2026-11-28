@@ -192,10 +192,4 @@ async function resolveStore(req, res, next) {
   return runWithStore(store._id, next);
 }
 
-/** Route-level guard: sirf store host par chalne wale endpoints ke liye */
-function requireStore(req, res, next) {
-  if (req.store) return next();
-  return notFound(res, req.tenant);
-}
-
-module.exports = { resolveStore, requireStore, resolveStoreByHost, clearStoreHostCache, isPlatformRoute };
+module.exports = { resolveStore, resolveStoreByHost, clearStoreHostCache, isPlatformRoute };

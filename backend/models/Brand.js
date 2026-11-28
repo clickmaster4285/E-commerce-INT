@@ -121,6 +121,7 @@ const tenantScope = require("../utils/tenantScopePlugin");
     { storeId: 1, brand_code: 1 },
     { unique: true, partialFilterExpression: { is_deleted: false } },
   );
+  brandSchema.index({ storeId: 1, is_deleted: 1, created_at: -1 });
 
   // ✅ Static: Sirf active (non-deleted) brands fetch karein
   brandSchema.statics.findActive = function (filter = {}) {

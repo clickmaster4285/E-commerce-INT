@@ -8,9 +8,8 @@ const orderSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true,
     },
-    checkout_draft_id: { type: mongoose.Schema.Types.ObjectId, default: null, index: true },
+    checkout_draft_id: { type: mongoose.Schema.Types.ObjectId, default: null },
     // Checkout attempt ki key (Idempotency-Key header) — double submit par ek hi order
     idempotency_key: { type: String, default: undefined },
 
@@ -119,10 +118,6 @@ const orderSchema = new mongoose.Schema(
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );
 
-// ✅ My-orders (user + status filter + newest-first sort) isi index se serve hote hain.
-orderSchema.index({ user_id: 1, status: 1, created_at: -1 });
-
-
 // ── Multi-tenant ──
 orderSchema.plugin(tenantScope); // har store ka data alag (storeId)
 orderSchema.index({ storeId: 1, order_number: 1 }, { unique: true }); // unique per store
@@ -130,5 +125,13 @@ orderSchema.index(
   { storeId: 1, idempotency_key: 1 },
   { unique: true, partialFilterExpression: { idempotency_key: { $type: "string" } } },
 );
+orderSchema.index(
+  { storeId: 1, checkout_draft_id: 1 },
+  { unique: true, partialFilterExpression: { checkout_draft_id: { $type: "objectId" } } },
+);
+orderSchema.index({ storeId: 1, created_at: -1 });
+orderSchema.index({ storeId: 1, status: 1, created_at: -1 });
+orderSchema.index({ storeId: 1, user_id: 1, created_at: -1 });
+orderSchema.index({ storeId: 1, "items.product_id": 1, created_at: -1 });
 
 module.exports = mongoose.model("Order", orderSchema);

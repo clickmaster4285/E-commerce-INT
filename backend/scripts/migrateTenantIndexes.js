@@ -4,8 +4,9 @@
 // Har store-scoped model par:
 //   • purane GLOBAL unique indexes (jin me storeId nahi) hatao — warna store B
 //     wo code/number use nahi kar sakta jo store A ke paas hai
-//   • naye { storeId, field } unique indexes banao
-//   • bina storeId wale documents report karo (kisi store me nazar nahi aayenge)
+//   • schema me se gayab stale indexes drop (unique + non-unique)
+//   • naye schema indexes createIndexes() se banao
+//   • bina storeId wale documents report karo
 //
 //   node scripts/migrateTenantIndexes.js                         → dry run
 //   node scripts/migrateTenantIndexes.js --apply                 → indexes theek
@@ -22,6 +23,59 @@ const APPLY = process.argv.includes("--apply");
 const assignIdx = process.argv.indexOf("--assign");
 const ASSIGN_TO = assignIdx > -1 ? process.argv[assignIdx + 1] : null;
 
+/** Stable key fingerprint for comparing index definitions. */
+function keyFingerprint(key) {
+  const ordered = {};
+  for (const k of Object.keys(key).sort()) ordered[k] = key[k];
+  return JSON.stringify(ordered);
+}
+
+function declaredIndexKeys(Model) {
+  const declared = Model.schema.indexes();
+  const keys = new Set(declared.map(([fields]) => keyFingerprint(fields)));
+  const unique = new Set(
+    declared.filter(([, opts]) => opts?.unique).map(([fields]) => keyFingerprint(fields)),
+  );
+  // Field-level index/unique (duplicate unique+index ek hi key banata hai)
+  for (const [pathName, pathType] of Object.entries(Model.schema.paths)) {
+    const opts = pathType?.options || {};
+    if (opts.index || opts.unique) {
+      const fp = keyFingerprint({ [pathName]: 1 });
+      keys.add(fp);
+      if (opts.unique) unique.add(fp);
+    }
+  }
+  return { keys, unique };
+}
+
+async function reportAndDropStaleIndexes(Model, name) {
+  const existing = await Model.collection.indexes().catch(() => []);
+  const { keys: declaredKeys, unique: declaredUnique } = declaredIndexKeys(Model);
+
+  const staleGlobalUnique = existing.filter(
+    (ix) => ix.unique && ix.name !== "_id_" && !("storeId" in ix.key) && !declaredUnique.has(keyFingerprint(ix.key)),
+  );
+  const obsolete = existing.filter(
+    (ix) =>
+      ix.name !== "_id_" &&
+      !declaredKeys.has(keyFingerprint(ix.key)) &&
+      !ix.textIndexVersion,
+  );
+
+  if (!staleGlobalUnique.length && !obsolete.length) return;
+
+  console.log(`\n${name} (${Model.collection.name})`);
+  for (const ix of staleGlobalUnique) {
+    console.log(`  drop global unique index ${ix.name}  ${JSON.stringify(ix.key)}`);
+    if (APPLY) await Model.collection.dropIndex(ix.name).catch((e) => console.warn(`    skip: ${e.message}`));
+  }
+  for (const ix of obsolete) {
+    if (staleGlobalUnique.some((s) => s.name === ix.name)) continue;
+    console.log(`  drop obsolete index ${ix.name}  ${JSON.stringify(ix.key)}`);
+    if (APPLY) await Model.collection.dropIndex(ix.name).catch((e) => console.warn(`    skip: ${e.message}`));
+  }
+}
+
 (async () => {
   await connectDB();
   const modelsDir = path.join(__dirname, "..", "models");
@@ -36,35 +90,18 @@ const ASSIGN_TO = assignIdx > -1 ? process.argv[assignIdx + 1] : null;
 
   console.log(APPLY ? "APPLY mode" : "DRY RUN (add --apply to change the DB)");
 
+  // ── Orphan storeId (tenant-scoped models only) ──
   for (const name of mongoose.modelNames()) {
     const Model = mongoose.model(name);
-    // Sirf tenantScope wale models (storeId field hona kaafi nahi — RefreshSession
-    // me storeId hai lekin superadmin sessions ka store null hi rehna chahiye)
     if (name === "Store" || !Model.schema.$tenantScopeField) continue;
-    // Global attributes kisi EK store ko assign nahi hote — har store ki copy bannti hai
     const copyPerStore = name === "Attribute";
 
-    const existing = await Model.collection.indexes().catch(() => []); // collection na ho to []
-    // Sirf wo global unique indexes jo ab schema me NAHI hain (schema me jaan boojh kar global
-    // rakhe gaye — jaise Review {product_id,user_id}, Quote token — chhed‑e nahi jate)
-    // (key + unique dono match hone chahiye — `index: true` wala non-unique index alag hai)
-    const declaredUnique = new Set(
-      Model.schema.indexes().filter(([, opts]) => opts?.unique).map(([fields]) => JSON.stringify(fields)),
-    );
-    const stale = existing.filter(
-      (ix) => ix.unique && ix.name !== "_id_" && !("storeId" in ix.key) && !declaredUnique.has(JSON.stringify(ix.key)),
-    );
     const orphans = await Model.countDocuments({ $or: [{ storeId: null }, { storeId: { $exists: false } }] });
-
-    if (!stale.length && !orphans) continue;
+    if (!orphans) continue;
     console.log(`\n${name} (${Model.collection.name})`);
-    for (const ix of stale) {
-      console.log(`  drop global unique index ${ix.name}  ${JSON.stringify(ix.key)}`);
-      if (APPLY) await Model.collection.dropIndex(ix.name);
-    }
     if (orphans && copyPerStore) {
       console.log(`  ${orphans} global document(s) → copy into every store: node scripts/migrateAttributesPerStore.js --apply`);
-    } else if (orphans) {
+    } else {
       console.log(`  ${orphans} document(s) without storeId${assignStore ? ` → ${assignStore.subdomain}` : " (use --assign <subdomain>)"}`);
       if (APPLY && assignStore) {
         await Model.updateMany(
@@ -73,6 +110,12 @@ const ASSIGN_TO = assignIdx > -1 ? process.argv[assignIdx + 1] : null;
         );
       }
     }
+  }
+
+  // ── Har model: schema.indexes() vs collection — stale drop (dry-run default) ──
+  for (const name of mongoose.modelNames()) {
+    if (name === "Store") continue;
+    await reportAndDropStaleIndexes(mongoose.model(name), name);
   }
 
   // Soft-delete unique compounds `{storeId, code, is_deleted}` → partial unique
@@ -89,11 +132,11 @@ const ASSIGN_TO = assignIdx > -1 ? process.argv[assignIdx + 1] : null;
     const Model = mongoose.model(name);
     const existing = await Model.collection.indexes().catch(() => []);
     const stale = existing.find(
-      (ix) => ix.unique && JSON.stringify(ix.key) === JSON.stringify(key),
+      (ix) => ix.unique && keyFingerprint(ix.key) === keyFingerprint(key),
     );
     if (!stale) continue;
     console.log(`\n${name}: drop soft-delete unique ${stale.name} ${JSON.stringify(stale.key)}`);
-    if (APPLY) await Model.collection.dropIndex(stale.name);
+    if (APPLY) await Model.collection.dropIndex(stale.name).catch((e) => console.warn(`  skip: ${e.message}`));
   }
 
   if (APPLY) {

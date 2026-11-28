@@ -98,11 +98,12 @@ const bannerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ✅ Active hero list (status + position order) isi index se serve hoti hai.
-bannerSchema.index({ status: 1, position: 1 });
-
-
-// ── Multi-tenant ──
-bannerSchema.plugin(tenantScope); // har store ka data alag (storeId)
+// ── Multi-tenant — storeId schema par hai; compound indexes neeche (index: false)
+bannerSchema.plugin(tenantScope, { index: false });
+bannerSchema.index({ storeId: 1, status: 1, position: 1 });
+bannerSchema.index({ storeId: 1, position: 1 }, { unique: true });
+// Banner scheduler — cross-store scan (optimizeplan §3.3)
+bannerSchema.index({ status: 1, startDate: 1 });
+bannerSchema.index({ status: 1, endDate: 1 });
 
 module.exports = mongoose.model("Banner", bannerSchema);

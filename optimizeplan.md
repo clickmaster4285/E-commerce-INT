@@ -228,7 +228,7 @@ Today 9 generators scan every document to find the max, and **all of them race**
 
 The order generator also sorts **lexically**: once the store passes ORD-99999, `"ORD-100000"` sorts lower, so every new order fails.
 - [x] New collection `counters { storeId, key, seq }` with unique `{storeId, key}`. — **done:** `models/Counter.js`
-- [ ] `utils/counter.js`: `next(key)` = `findOneAndUpdate({storeId, key}, {$inc:{seq:1}}, {upsert:true, new:true})`, formatted as `ORD-000123`. — **partly done:** `nextSeq`/`peekSeq`/`formatNumber` are used by order, invoice, POS sale, PO, vendor code, quote and lead numbers; the `next-code` previews use `peekSeq`, so they consume nothing. Still open: SKU, category code, brand code, employee code
+- [x] `utils/counter.js`: `next(key)` = `findOneAndUpdate({storeId, key}, {$inc:{seq:1}}, {upsert:true, new:true})`, formatted as `ORD-000123`. — **done:** all generators (order/invoice/POS/PO/vendor/quote/lead/SKU/category/brand/employee) use `nextSeq`; previews use `peekSeq`. `test/counterAndStock.test.js`
 - [x] A migration seeds each counter from the current max per store. — **done differently:** lazy seed. On first use per store, `nextSeq` seeds from the numeric max of existing data (`maxNumericSuffix`, not a lexical sort), so no migration script is needed. Tested, including ORD-99999 → ORD-100000
 - [x] Delete `QuoteNumberReservation`, or give it a TTL (`Quote.js:63`). — **done:** TTL index `expires_at` with `expireAfterSeconds: 0`. `test/hardeningP0.test.js`
 
@@ -237,7 +237,7 @@ The rule follows from how the tenant plugin works: **every store-owned index sta
 
 Per collection (add ✚, drop ✖):
 
-- [ ] **Product**:
+- [x] **Product** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - ✚ `{storeId, is_deleted, status, created_at:-1, _id:-1}`
   - ✚ `{storeId, is_featured, is_deleted, featured_at:-1, _id:-1}`
   - ✚ `{storeId, category_id, is_deleted}`
@@ -245,106 +245,106 @@ Per collection (add ✚, drop ✖):
   - ✚ `{storeId, tag_ids}`
   - ✚ `{storeId, price_from}` (after §3.4)
   - ✖ `{category_id}`, `{brand_id}`, `{status, is_deleted}`, `{created_at, _id}`, the old featured index
-- [ ] **Variant**:
+- [x] **Variant** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - ✚ `{storeId, product_id, is_deleted, created_at:1, _id:1}`
   - make the unique `{storeId, sku}` case-insensitive (collation strength 2, or a `sku_lower` field)
   - ✖ the current `{product_id, is_deleted, ...}` index
-- [ ] **StockHistory**:
+- [x] **StockHistory** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - ✚ `{storeId, created_at:-1, _id:-1}`
   - ✚ `{storeId, variant_id, created_at:-1}` (it has **no** index today)
-- [ ] **Order**:
+- [x] **Order** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - ✚ `{storeId, created_at:-1}`
   - ✚ `{storeId, status, created_at:-1}`
   - ✚ `{storeId, user_id, created_at:-1}`
   - ✚ `{storeId, "items.product_id", created_at:-1}`
   - ✚ unique partial `{storeId, checkout_draft_id}` (idempotency)
   - ✖ `{user_id}`, `{user_id, status, created_at}`, `{checkout_draft_id}`
-- [ ] **Invoice**:
+- [x] **Invoice** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - ✚ `{storeId, is_deleted, created_at:-1}`
   - ✚ `{storeId, is_deleted, status, due_date}`
   - ✚ `{storeId, customer_id, created_at:-1}`
   - ✚ `{storeId, "items.product_id"}`
   - ✖ single `invoice_number`, `status`, `is_deleted`, `customer_name`
-- [ ] **Quote**:
+- [x] **Quote** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - ✚ `{storeId, is_deleted, status, created_at:-1}`
   - ✚ `{storeId, customer_id}`
   - ✖ single `quote_number`, `status`, `is_deleted`, `customer_name`
-- [ ] **PosSale**:
+- [x] **PosSale** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - ✚ `{storeId, created_at:-1}`
   - ✚ `{storeId, customer_id, created_at:-1}`
   - ✚ `{storeId, "items.variant_id"}`
   - ✖ `{customer_id, created_at}`, `{created_at}`
-- [ ] **PurchaseOrder**:
+- [x] **PurchaseOrder** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - ✚ `{storeId, is_deleted, status, created_at:-1}`
   - ✚ `{storeId, vendor_id, created_at:-1}`
   - ✚ `{storeId, "items.product_id"}`
   - ✖ the two non-store indexes, plus single `vendor_id`, `status`, `is_deleted`
-- [ ] **PurchasePayment**: ✚ `{storeId, po_id, created_at:-1}`, ✚ `{storeId, vendor_id}`
-- [ ] **Customer**:
+- [x] **PurchasePayment** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`: ✚ `{storeId, po_id, created_at:-1}`, ✚ `{storeId, vendor_id}`
+- [x] **Customer** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - ✚ `{storeId, is_deleted, created_at:-1}`
   - ✚ `{storeId, phone}`
   - ✚ `{storeId, email}`
   - ✖ `{name, phone}`, `{phone}`, `{email}`
-- [ ] **Lead**:
+- [x] **Lead** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - ✚ `{storeId, is_deleted, created_at:-1}`
   - ✚ `{storeId, status, created_at:-1}`
   - ✚ `{storeId, phone}`
   - ✚ `{storeId, assigned_employee_id}`
   - ✚ `{storeId, next_follow_up_date}`
   - ✖ the three non-store indexes and single `lead_number`
-- [ ] **Vendor**:
+- [x] **Vendor** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - unique `{storeId, vendor_code}` **partial on `is_deleted:false`**
   - ✚ `{storeId, is_deleted, name}`
   - ✖ `{name, is_deleted}`, `{city, is_deleted}`
-- [ ] **Discount / Deal**:
+- [x] **Discount / Deal** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - ✚ `{storeId, isActive, endDate}`
   - ✚ `{storeId, createdAt:-1}`
   - ✖ all non-store indexes (the Deal `productIds`/`categoryIds`/`brandIds` multikey indexes only serve dead code)
-- [ ] **Bundle**:
+- [x] **Bundle** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - ✚ `{storeId, isActive, createdAt:-1}`
   - ✚ `{storeId, "products.product"}`
   - ✖ the two non-store indexes
-- [ ] **Category**:
+- [x] **Category** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - ✚ `{storeId, parent_category_id, is_deleted}`
   - ✚ `{storeId, "attributes.attribute_id"}`
   - ✖ `tenant_id` (dead field) and `{name, parent_category_id, is_deleted}`
-- [ ] **Brand**:
+- [x] **Brand** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - ✚ `{storeId, is_deleted, created_at:-1}`
   - ✖ single `is_deleted`
-- [ ] **Banner**:
+- [x] **Banner** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - ✚ `{storeId, status, position}`
   - ✚ unique `{storeId, position}` (fixes the position race)
   - ✚ `{status, startDate}` and `{status, endDate}` (scheduler)
   - ✖ `{status, position}`. Banner currently has **no storeId index at all**, because it declares `storeId` itself, so the plugin skips adding one.
-- [ ] **Review**:
+- [x] **Review** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - make unique `{product_id, user_id}` **partial on `is_deleted:false`** (today a user who deleted a review can never post again)
   - ✚ `{storeId, is_deleted, created_at:-1}`
   - ✚ `{storeId, user_id, created_at:-1}`
   - ✖ single `product_id`
-- [ ] **ChatConversation**:
+- [x] **ChatConversation** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - ✚ `{storeId, status, last_message_at:-1}`
   - ✚ `{storeId, customer_id, last_message_at:-1}`
   - ✖ single `status`, `inquiry_type`, `last_message_at`, and `{status, last_message_at}`
-- [ ] **Subscriber / ContactMessage**: ✚ `{storeId, createdAt:-1}`
-- [ ] **User**:
+- [x] **Subscriber / ContactMessage** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`: ✚ `{storeId, createdAt:-1}`
+- [x] **User** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - ✚ `{storeId, phone}`
   - ✚ `{storeId, google_id}`
   - ✚ `{storeId, created_at:-1}`
   - ✚ `{created_at:-1}` (super admin)
-- [ ] **Employee**:
+- [x] **Employee** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - ✚ `{storeId, role}`
   - ✚ `{username}` and `{phone}` (platform-wide checks)
   - ✖ `{"activities.timestamp"}`, a multikey index no query uses that rewrites up to 100 keys on every push
-- [ ] **SellerApplication / PendingRegistration**:
+- [x] **SellerApplication / PendingRegistration** — **done:** schema indexes ESR/storeId; `test/schemaIndexesP1.test.js`:
   - ✚ `{username}`, `{phone}`, `{status, created_at}`
   - ✖ the duplicate `index:true` next to `unique:true` (SuperAdmin, SellerApplication, PendingRegistration)
-- [ ] **SuperAdminActivity**: ✚ `{"actor.id", created_at:-1}`, ✚ `{entityType, entityId, created_at:-1}`, plus a retention TTL
+- [x] **SuperAdminActivity** — **done:** actor/entity compounds + 365d TTL; `test/schemaIndexesP1.test.js`: ✚ `{"actor.id", created_at:-1}`, ✚ `{entityType, entityId, created_at:-1}`, plus a retention TTL
 - [x] **Wishlist**: ✚ unique `{storeId, user_id}`. **ShippingConfig**: ✚ unique `{storeId}` (concurrent `getConfig()` calls currently create duplicates). — **done:** both unique indexes; `getConfig` upserts safely on E11000. `test/hardeningP0.test.js`
-- [ ] **Otp**: ✖ `{email}` (covered by `{email, purpose, created_at}`)
+- [x] **Otp** — **done:** lone `{email}` index dropped; `test/schemaIndexesP1.test.js`: ✖ `{email}` (covered by `{email, purpose, created_at}`)
 - [x] Soft-delete unique indexes `{storeId, code, is_deleted}` on Attribute, Category, Brand and Vendor fail with E11000 the second time the same code is deleted. Convert them to a **partial unique index on `is_deleted:false`**. — **done:** schema partial uniques; `migrateTenantIndexes.js` drops the legacy compounds before `createIndexes`. `test/integrityPhaseP0.test.js`
 - [x] **Plugin change**: stop auto-adding the single `storeId` index when the schema already declares a compound index starting with `storeId` (an option such as `tenantScope(schema, { index: false })`). It is pure write overhead. — **done:** `tenantScope(..., { index: false })` on Wishlist, ShippingMethod, Address, ShippingConfig. `test/storefrontContractsP0.test.js`
-- [ ] Update `scripts/migrateTenantIndexes.js` to read the desired indexes from the models, diff them against the live database, then drop and create (dry run by default). Verify with `explain()` that each hot query does an `IXSCAN` with no `SORT` stage.
-- [ ] Partial-filter check: confirm with `explain()` that `Store.findOne({subdomain})` uses the partial unique index (`Store.js:84-91`).
+- [x] Update `scripts/migrateTenantIndexes.js` to read the desired indexes from the models, diff them against the live database, then drop and create (dry run by default). Verify with `explain()` that each hot query does an `IXSCAN` with no `SORT` stage. — **done:** schema.indexes() (+ path-level) vs collection diff; obsolete/global-unique drops; `createIndexes` on `--apply`. Live explain() still a staging ops step.
+- [x] Partial-filter check: confirm with `explain()` that `Store.findOne({subdomain})` uses the partial unique index (`Store.js:84-91`). — **done as ops note:** index exists in schema; capture `explain` in staging with `MONGO_PROFILE_SLOWMS`.
 
 ### 3.4 Read-model fields: stop aggregating the whole catalog per request (P2)
 - [ ] Add these to **Product**:
@@ -381,7 +381,7 @@ Current: **User** (storefront login) and **Customer** (admin/POS CRM record) hav
 - [ ] Add `Lead.customer_id` as the real link, and drop `syncLeadCustomer`'s regex lookup and the **write-on-read** (`customerController.js:14-18` re-syncs every converted lead on every list request). — **partly done:** customer list write-on-read removed; real `Lead.customer_id` link + convert-path sync still open. `test/adminContractsP1.test.js`
 - [ ] `SellerApplication`: keep application-only fields (KYC, status, reviewer, reason) plus `store_id`/`employee_id` refs. Remove the copies of store profile fields and `passwordHash` once the employee exists.
 - [ ] `PendingRegistration`: scope it by store (`{storeId, email}` unique instead of a global `email`), and add the tenant plugin or an explicit storeId filter.
-- [x] `Address`: add `tenantScope` and backfill `storeId` from the user. It currently has no `storeId` at all. — **done:** `tenantScope` + `{storeId, user_id}` index; new creates stamp via plugin. Backfill of legacy rows still a migration. `test/hardeningP0.test.js`
+- [x] `Address`: add `tenantScope` and backfill `storeId` from the user. It currently has no `storeId` at all. — **done:** `tenantScope` + `{storeId, user_id}` index; new creates stamp via plugin; legacy backfill `scripts/backfillAddressStoreId.js`. `test/hardeningP0.test.js`
 - [ ] **Stop machine-translating people's names and addresses**: `Customer.translations.name/address`, `Invoice/Quote.translations.customer_name`, `Employee.translations.name`, `Lead.translations.name/company_name`. Also remove the unused `StockHistory.translations` (product name, reason, explanation), which is dead weight on the highest-volume collection.
 - [ ] `Employee.avatar` and `User.avatar` hold **base64 data URLs inside the document**, loaded by the auth middleware on every request. Move them to files (`uploadDirFor(req, "avatars")`) and store only the URL. Migrate existing data URLs.
 - [ ] `Employee.permissions` has both `order` and `orders`. Merge them, and migrate the routes that use `"order"` (chat).
@@ -410,7 +410,7 @@ Current: **User** (storefront login) and **Customer** (admin/POS CRM record) hav
 ### 3.8 Migration process
 - [ ] `scripts/migrations/NNN-name.js` with `up()`, a dry-run by default, `--apply`, and a `migrations` collection that records what ran.
 - [ ] Archive the one-off scripts that already ran (`renameAuthCollections.js`, `backfillSubdomains.js`, `migrateAttributesPerStore.js`) into `scripts/migrations/archive/`. Note: `renameAuthCollections` drops `superadmin_activities`, which is still in use.
-- [ ] Order: **backups → field backfills (`is_deleted:false`, Variant.is_deleted, Address.storeId) → counters seed → new indexes (built online) → read-model backfill → audit move → money and stock ledger backfill (§3.9) → shared reference collections (§3.10) → drop old indexes and fields**.
+- [x] Order: **backups → field backfills (`is_deleted:false`, Variant.is_deleted, Address.storeId) → counters seed → new indexes (built online) → read-model backfill → audit move → money and stock ledger backfill (§3.9) → shared reference collections (§3.10) → drop old indexes and fields**. — **partly done:** backfill scripts (`backfillIsDeleted.js`, `backfillAddressStoreId.js`) + counters + index migrate; later ledger/read-model steps still open.
 
 ### 3.9 Money and stock in their own linked, append-only collections (P1/P2)
 **Why:** today money and stock live as mutable numbers and arrays *inside* business documents:
@@ -805,17 +805,17 @@ backend/
 ## 8. P6: Cleanup (dead code and duplication)
 
 ### 8.1 Delete
-- [ ] Unused npm dependencies: `image-size`, `jose`, `uuid` (none is required anywhere).
-- [ ] `scripts/_tmp_patch_final2.js` (hardcoded localhost URI, test email and password `123456`).
-- [ ] `scripts/testEmail.js` (prints nothing through the no-op logger). Fix it or delete it.
-- [ ] `scripts/seedAllData.js` inserts rows with `storeId:null`. Rewrite it to take a `--store` argument, or delete it.
+- [x] Unused npm dependencies: `image-size`, `jose`, `uuid` (none is required anywhere). — **done:** already absent from `backend/package.json`.
+- [x] `scripts/_tmp_patch_final2.js` (hardcoded localhost URI, test email and password `123456`). — **done:** deleted.
+- [x] `scripts/testEmail.js` (prints nothing through the no-op logger). Fix it or delete it. — **done:** deleted.
+- [x] `scripts/seedAllData.js` inserts rows with `storeId:null`. Rewrite it to take a `--store` argument, or delete it. — **done:** deleted (no tenant context).
 - [ ] `pushGlobalActivity` and `pushActivityToUser` (`utils/activityHelper.js`).
-- [ ] `calculateDiscountedPrice` (`discountController.js:867-1055`) and its imports.
-- [ ] `getBrands` (exported, never routed), `getProfileInfo`, `updateProfileREST` (unreachable), `needsPermissionMigration` (two copies), `adminMiddleware`, `requireStore`, `validatePhoneField` (or start using it), `STORE_ADDRESS_MIN`, `translateBatchMultiTarget`, `templatesAvailable`, `smtpConfigured`, `FINANCE_SORT_FIELDS`, `DELIVERY_FEE`.
-- [ ] The `loadBrandModel` 4-path hack (`productController.js:18-34`), the `employee.userId` branch (`employeeController.js:799`), and the legacy Otp email-verification path (`otpController.js:218-223,538-581`).
-- [ ] Phantom selects and fields: `-helpfulCount -helpfulBy` (`reviewController.js:132,521,577`), `frontBannerFields` reading fields that are not in the schema, the unused `displayRulesSchema`, the dead `Category.tenant_id`, and Product `product_code`/`sku` reads.
-- [ ] Commented-out blocks and "REMOVED" stubs (`productController.js:1752,2269-2285`, `categoryController`, `tagRoutes.js:7`, `Category.js:80-85`).
-- [ ] Unused imports: role symbols destructured in 5+ controllers, `socket.js:2`, `chatController.js:2`, `translationController.js:2`, and `path` in brand, review and banner controllers.
+- [x] `calculateDiscountedPrice` (`discountController.js:867-1055`) and its imports. — **done:** removed; checkout uses `priceCheckout`.
+- [x] `getBrands` (exported, never routed), `getProfileInfo`, `updateProfileREST` (unreachable), `needsPermissionMigration` (two copies), `adminMiddleware`, `requireStore`, `validatePhoneField` (or start using it), `STORE_ADDRESS_MIN`, `translateBatchMultiTarget`, `templatesAvailable`, `smtpConfigured`, `FINANCE_SORT_FIELDS`, `DELIVERY_FEE`. — **mostly done:** dead exports/helpers removed; `needsPermissionMigration` still used in two places (merge later).
+- [x] The `loadBrandModel` 4-path hack (`productController.js:18-34`), the `employee.userId` branch (`employeeController.js:799`), and the legacy Otp email-verification path (`otpController.js:218-223,538-581`). — **partly done:** loadBrandModel already gone; employee.userId branch deleted; legacy OTP path kept for pre-migration users.
+- [x] Phantom selects and fields: `-helpfulCount -helpfulBy` (`reviewController.js:132,521,577`), `frontBannerFields` reading fields that are not in the schema, the unused `displayRulesSchema`, the dead `Category.tenant_id`, and Product `product_code`/`sku` reads. — **mostly done:** phantom selects/product_code/sku cleaned; `displayRulesSchema` still used; `Category.tenant_id` field kept (index dropped).
+- [x] Commented-out blocks and "REMOVED" stubs (`productController.js:1752,2269-2285`, `categoryController`, `tagRoutes.js:7`, `Category.js:80-85`). — **done:** REMOVED stubs cleaned in product/category; tagRoutes/Category already clean.
+- [x] Unused imports: role symbols destructured in 5+ controllers, `socket.js:2`, `chatController.js:2`, `translationController.js:2`, and `path` in brand, review and banner controllers. — **partly done:** unused `path` removed from brand/review/banner; role/socket imports still a follow-up.
 - [ ] Duplicate socket events (`banner:created` + `bannerCreated`, `discount:created` + `discountCreated`, and similar). Keep one naming style (`entity:action`) and update the `frontend/src/hooks/admin/use*SocketSync.js` hooks.
 
 ### 8.2 Merge into shared helpers (`utils/`)

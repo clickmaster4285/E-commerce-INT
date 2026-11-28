@@ -66,10 +66,10 @@ const invoiceActivitySchema = new mongoose.Schema({
 }, { _id: true });
 
 const invoiceSchema = new mongoose.Schema({
-  invoice_number: { type: String, required: true, trim: true, index: true },
+  invoice_number: { type: String, required: true, trim: true },
   
   // Customer Reference (Only Customers, no Leads)
-  customer_id: { type: mongoose.Schema.Types.ObjectId, ref: "Customer", required: true, index: true },
+  customer_id: { type: mongoose.Schema.Types.ObjectId, ref: "Customer", required: true },
   
   // Snapshot Data (To keep invoice history safe even if customer details change later)
   customer_name: { type: String, required: true, trim: true },
@@ -103,22 +103,22 @@ const invoiceSchema = new mongoose.Schema({
   payments: { type: [invoicePaymentSchema], default: [] },
   returns: { type: [invoiceReturnSchema], default: [] },
   activity: { type: [invoiceActivitySchema], default: [] },
-  status: { type: String, enum: ["Unpaid", "Partially Paid", "Paid", "Overdue"], default: "Unpaid", index: true },
+  status: { type: String, enum: ["Unpaid", "Partially Paid", "Paid", "Overdue"], default: "Unpaid" },
   
   sent_at: { type: Date, default: null },
   paid_at: { type: Date, default: null },
   
   createdby: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
   updatedby: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
-  is_deleted: { type: Boolean, default: false, index: true },
+  is_deleted: { type: Boolean, default: false },
 }, { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } });
-
-invoiceSchema.index({ status: 1, due_date: 1, created_at: -1 });
-invoiceSchema.index({ customer_name: 1 });
-
 
 // ── Multi-tenant ──
 invoiceSchema.plugin(tenantScope); // har store ka data alag (storeId)
 invoiceSchema.index({ storeId: 1, invoice_number: 1 }, { unique: true }); // unique per store
+invoiceSchema.index({ storeId: 1, is_deleted: 1, created_at: -1 });
+invoiceSchema.index({ storeId: 1, is_deleted: 1, status: 1, due_date: 1 });
+invoiceSchema.index({ storeId: 1, customer_id: 1, created_at: -1 });
+invoiceSchema.index({ storeId: 1, "items.product_id": 1 });
 
 module.exports = mongoose.model("Invoice", invoiceSchema);

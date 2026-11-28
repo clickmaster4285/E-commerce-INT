@@ -9,7 +9,6 @@ const superAdminSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      index: true,
     },
     // bcrypt hash — never plain text; omit from default queries (§9.3)
     passwordHash: { type: String, required: true, select: false },

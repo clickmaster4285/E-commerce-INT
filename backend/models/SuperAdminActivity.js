@@ -12,7 +12,6 @@ const superAdminActivitySchema = new mongoose.Schema(
       type: String,
       enum: ["seller_application", "store", "user", "superadmin", "auth", "settings", "system", "plan"],
       default: "system",
-      index: true,
     },
     entityId: { type: String, default: "" },
     details: { type: mongoose.Schema.Types.Mixed, default: {} },
@@ -24,5 +23,9 @@ const superAdminActivitySchema = new mongoose.Schema(
 );
 
 superAdminActivitySchema.index({ created_at: -1 });
+superAdminActivitySchema.index({ "actor.id": 1, created_at: -1 });
+superAdminActivitySchema.index({ entityType: 1, entityId: 1, created_at: -1 });
+// Audit retention — 365 din ke baad auto purge (optimizeplan §3.3)
+superAdminActivitySchema.index({ created_at: 1 }, { expireAfterSeconds: 31_536_000 });
 
 module.exports = mongoose.model("SuperAdminActivity", superAdminActivitySchema);

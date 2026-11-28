@@ -83,14 +83,9 @@ const bundleSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ==========================================
-// INDEXES
-// ==========================================
-bundleSchema.index({ isActive: 1, createdAt: -1 });
-bundleSchema.index({ "products.product": 1 });
-
-
 // ── Multi-tenant ──
 bundleSchema.plugin(tenantScope); // har store ka data alag (storeId)
+bundleSchema.index({ storeId: 1, isActive: 1, createdAt: -1 });
+bundleSchema.index({ storeId: 1, "products.product": 1 });
 
 module.exports = mongoose.model("Bundle", bundleSchema);

@@ -1,12 +1,12 @@
 const Brand = require("../models/Brand");
 const Product = require("../models/Product");
-const path = require("path");
 const fs = require("fs-extra");
 const { getIO } = require("../utils/socket");
 const log = require("../utils/logger");
 const { withoutProtected } = require("../utils/sanitizeBody"); // mass assignment guard
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 const { queueTranslationSync } = require("../utils/translationService");
+const { nextSeq, peekSeq, formatNumber, maxNumericSuffix } = require("../utils/counter");
 
 // ==========================================
 // SOCKET HELPER — same pattern as
@@ -27,33 +27,14 @@ const emitSocketEvent = (event, data) => {
 // ================================
 // GET NEXT BRAND CODE
 // ================================
-// ✅ Always finds the HIGHEST existing numeric Brand Code (BRD-###) in the
-// database (active + soft deleted) and adds +1. Numeric comparison is used,
-// so BRD-009 -> BRD-010, BRD-099 -> BRD-100, BRD-999 -> BRD-1000 etc.
-const generateNextBrandCode = async () => {
-  // ✅ DB-side MAX (ek hi fast query) — poori collection Node me lane ki
-  // bajaye numeric part ka max nikalte hain, is liye brands zyada hon par
-  // bhi code generate foran hota hai.
-  const [row] = await Brand.aggregate([
-    { $match: { brand_code: /^BRD-\d+$/ } },
-    {
-      $addFields: {
-        __num: {
-          $convert: {
-            input: { $arrayElemAt: [{ $split: ["$brand_code", "-"] }, 1] },
-            to: "int",
-            onError: 0,
-            onNull: 0,
-          },
-        },
-      },
-    },
-    { $group: { _id: null, maxNum: { $max: "$__num" } } },
-  ]);
+const brandSeed = () => maxNumericSuffix(Brand, "brand_code", /^BRD-\d+$/);
 
-  const maxNum = Number(row?.maxNum) || 0;
-  return `BRD-${String(maxNum + 1).padStart(3, "0")}`;
-};
+// Atomic per-store brand codes (optimizeplan §3.2) — BRD-009 → BRD-010, no race.
+const generateNextBrandCode = async () =>
+  formatNumber("BRD-", await nextSeq("brand", { seed: brandSeed }), 3);
+
+const previewNextBrandCode = async () =>
+  formatNumber("BRD-", await peekSeq("brand", { seed: brandSeed }), 3);
 
 // ✅ Ensures the stored value is always a clean "BRD-###"-style string.
 // Never allows objects / "[object Object]" / undefined / null through.
@@ -73,7 +54,7 @@ const normalizeBrandCode = (value) => {
 
 const getNextBrandCode = async (req, res) => {
   try {
-    const nextCode = await generateNextBrandCode();
+    const nextCode = await previewNextBrandCode();
     res.status(200).json({ success: true, data: { nextCode } });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -159,31 +140,6 @@ const createBrand = async (req, res) => {
 };
 
 // ================================
-// GET ALL BRANDS
-// ================================
-const getBrands = async (req, res) => {
-  try {
-    const brands = await Brand.find({ is_deleted: false })
-      .sort({ created_at: -1 })
-      .populate("createdby", "name email")
-      .populate("updatedby", "name email");
-
-    const brandsWithProducts = await Promise.all(
-      brands.map(async (brand) => {
-        const products = await Product.find({ brand_id: brand._id })
-          .populate("category_id", "name translations")
-          .select("name brand_id category_id status created_at");
-        return { ...brand.toObject(), products };
-      })
-    );
-
-    res.status(200).json({ success: true, data: brandsWithProducts });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-};
-
-// ================================
 // GET SINGLE BRAND
 // ================================
 const getBrandById = async (req, res) => {
@@ -245,7 +201,7 @@ const getBrandWithProducts = async (req, res) => {
     }
 
     const products = await Product.find({ brand_id: brand._id, is_deleted: { $ne: true }, status: "active" })
-      .select("name product_code sku description status category_id translations")
+      .select("name description status category_id translations")
       .populate("category_id", "name translations")
       .lean();
 
@@ -622,7 +578,6 @@ const getBrandOptions = async (req, res) => {
 module.exports = {
   getNextBrandCode,
   createBrand,
-  getBrands,
   getBrandsPublic,
   getBrandsAdmin,
   getBrandOptions,

@@ -160,17 +160,14 @@ const productSchema = new mongoose.Schema(
   }
 );
 
-productSchema.index({ category_id: 1 });
-productSchema.index({ brand_id: 1 });
-productSchema.index({ status: 1, is_deleted: 1 });
-// ✅ Featured Products page — filter (is_featured) + "recent first" sort dono
-//    is compound index se serve hote hain (bina in-memory sort). `_id` tie-break
-//    un products ke liye hai jinka featured_at abhi null hai (purana data / seed).
-productSchema.index({ is_featured: 1, is_deleted: 1, featured_at: -1, _id: -1 });
-// ✅ Products list pagination — sort ({ created_at: -1, _id: -1 }) isi index se
-//    serve hota hai (bina in-memory sort), aur _id tie-break pages ko overlap hone
-//    se rokta hai jab kai products ka created_at same ho.
-productSchema.index({ created_at: -1, _id: -1 });
+// ✅ §3.3 — har compound storeId se shuru (ESR rule)
+productSchema.index({ storeId: 1, is_deleted: 1, status: 1, created_at: -1, _id: -1 });
+productSchema.index({ storeId: 1, is_featured: 1, is_deleted: 1, featured_at: -1, _id: -1 });
+productSchema.index({ storeId: 1, category_id: 1, is_deleted: 1 });
+productSchema.index({ storeId: 1, brand_id: 1, is_deleted: 1 });
+productSchema.index({ storeId: 1, tag_ids: 1 });
+// price_from §3.4 read-model field — index abhi se ready
+productSchema.index({ storeId: 1, price_from: 1 });
 
 
 // ── Multi-tenant ──

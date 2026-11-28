@@ -75,13 +75,13 @@ const leadSchema = new mongoose.Schema({
   deleted_at: { type: Date, default: null },
 }, { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } });
 
-leadSchema.index({ created_at: -1, _id: -1 });
-leadSchema.index({ status: 1, is_deleted: 1, created_at: -1 });
-leadSchema.index({ phone: 1, is_deleted: 1 });
-
-
 // ── Multi-tenant ──
 leadSchema.plugin(tenantScope); // har store ka data alag (storeId)
 leadSchema.index({ storeId: 1, lead_number: 1 }, { unique: true, partialFilterExpression: { lead_number: { $type: "string" } } }); // unique per store
+leadSchema.index({ storeId: 1, is_deleted: 1, created_at: -1 });
+leadSchema.index({ storeId: 1, status: 1, created_at: -1 });
+leadSchema.index({ storeId: 1, phone: 1 });
+leadSchema.index({ storeId: 1, assigned_employee_id: 1 });
+leadSchema.index({ storeId: 1, next_follow_up_date: 1 });
 
 module.exports = mongoose.model("Lead", leadSchema);

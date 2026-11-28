@@ -1,29 +1,21 @@
 const Variant = require("../models/Variant");
+const { nextSeq, peekSeq, maxNumericSuffix } = require("./counter");
 
+const skuSeed = () => maxNumericSuffix(Variant, "sku", /^sku_\d+$/i);
+
+/** Atomic next SKU for the current store (optimizeplan §3.2). */
 const getNextSku = async () => {
-  const variants = await Variant.find({
-    sku: /^sku_\d+$/i,
-  })
-    .select("sku -_id")
-    .lean();
+  const seq = await nextSeq("sku", { seed: skuSeed });
+  return `sku_${seq}`;
+};
 
-  let highestNumber = 0;
-
-  for (const variant of variants) {
-    const match = variant.sku?.match(/^sku_(\d+)$/i);
-
-    if (match) {
-      const number = Number(match[1]);
-
-      if (number > highestNumber) {
-        highestNumber = number;
-      }
-    }
-  }
-
-  return `sku_${highestNumber + 1}`;
+/** Preview only — does not consume a number. */
+const peekNextSku = async () => {
+  const seq = await peekSeq("sku", { seed: skuSeed });
+  return `sku_${seq}`;
 };
 
 module.exports = {
   getNextSku,
+  peekNextSku,
 };

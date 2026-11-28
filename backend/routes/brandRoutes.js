@@ -2,7 +2,6 @@ const express = require("express");
 const {
   getNextBrandCode,
   createBrand,
-  getBrands,
   getBrandsPublic,
   getBrandsAdmin,
   getBrandOptions,

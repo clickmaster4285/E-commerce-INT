@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-const path = require("path");
 const fs = require("fs-extra");
 const Review = require("../models/Review");
 const Product = require("../models/Product");
@@ -130,7 +129,6 @@ const getProductReviews = async (req, res) => {
     const total = await Review.countDocuments(filter);
 
     const reviewsRaw = await Review.find(filter)
-      .select("-helpfulCount -helpfulBy")
       .populate("user_id", "name avatar")
       .sort(sort)
       .skip((page - 1) * limit)
@@ -538,7 +536,6 @@ const getAdminReviews = async (req, res) => {
 
     const total = await Review.countDocuments(filter);
     const reviews = await Review.find(filter)
-      .select("-helpfulCount -helpfulBy")
       .populate("product_id", "name translations")
       .sort(sort)
       .skip((page - 1) * limit)
@@ -594,7 +591,6 @@ const getAdminReviewById = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid review ID" });
     }
     const review = await Review.findOne({ _id: req.params.id, is_deleted: { $ne: true } })
-      .select("-helpfulCount -helpfulBy")
       .populate("product_id", "name translations")
       .lean();
     if (!review) return res.status(404).json({ success: false, message: "Review not found" });

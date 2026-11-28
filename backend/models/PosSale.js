@@ -232,12 +232,11 @@ const posSaleSchema = new mongoose.Schema(
   }
 );
 
-posSaleSchema.index({ customer_id: 1, created_at: -1 });
-posSaleSchema.index({ created_at: -1 });
-
-
 // ── Multi-tenant ──
 posSaleSchema.plugin(tenantScope); // har store ka data alag (storeId)
 posSaleSchema.index({ storeId: 1, sale_number: 1 }, { unique: true }); // unique per store
+posSaleSchema.index({ storeId: 1, created_at: -1 });
+posSaleSchema.index({ storeId: 1, customer_id: 1, created_at: -1 });
+posSaleSchema.index({ storeId: 1, "items.variant_id": 1 });
 
 module.exports = mongoose.model("PosSale", posSaleSchema);

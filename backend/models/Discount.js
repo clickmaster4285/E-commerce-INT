@@ -247,24 +247,10 @@ const discountSchema = new mongoose.Schema(
 // INDEXES
 // =====================================================
 
-discountSchema.index({
-  isActive: 1,
-  endDate: 1,
-});
-
-discountSchema.index({
-  code: 1,
-  is_deleted: 1,
-});
-
-discountSchema.index({
-  applyTo: 1,
-  isActive: 1,
-});
-
-
 // ── Multi-tenant ──
 discountSchema.plugin(tenantScope); // har store ka data alag (storeId)
 discountSchema.index({ storeId: 1, code: 1 }, { unique: true }); // unique per store
+discountSchema.index({ storeId: 1, isActive: 1, endDate: 1 });
+discountSchema.index({ storeId: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Discount", discountSchema);

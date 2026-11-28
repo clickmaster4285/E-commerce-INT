@@ -68,6 +68,36 @@ test("lazy seed continues from existing data (numeric, not lexical: ORD-99999 �
   });
 });
 
+test("SKU / category / brand / employee helpers use atomic nextSeq (§3.2 remainder)", async (t) => {
+  if (!connected) return t.skip("MongoDB not reachable");
+  const { getNextSku, peekNextSku } = require("../utils/skuHelper");
+  const { getNextCategoryCode, peekNextCategoryCode } = require("../utils/categoryCodeHelper");
+  const Brand = require("../models/Brand");
+  const Category = require("../models/Category");
+  const Employee = require("../models/Employee");
+
+  const store = new mongoose.Types.ObjectId();
+  await runWithStore(store, async () => {
+    await Variant.collection.insertOne({ storeId: store, product_id: new mongoose.Types.ObjectId(), sku: "sku_9", title: "T", cost_price: 1, selling_price: 2, quantity: 0 });
+    assert.equal(await peekNextSku(), "sku_10", "SKU preview does not consume");
+    assert.equal(await getNextSku(), "sku_10");
+    assert.equal(await getNextSku(), "sku_11");
+
+    await Category.collection.insertOne({ storeId: store, name: "C", category_code: "cat_42", is_deleted: false });
+    assert.equal(await peekNextCategoryCode(), "cat_43");
+    assert.equal(await getNextCategoryCode(), "cat_43");
+
+    await Brand.collection.insertOne({ storeId: store, name: "B", brand_code: "BRD-099", is_deleted: false });
+    const brandSeed = () => maxNumericSuffix(Brand, "brand_code", /^BRD-\d+$/);
+    assert.equal(formatNumber("BRD-", await peekSeq("brand", { seed: brandSeed }), 3), "BRD-100");
+    assert.equal(formatNumber("BRD-", await nextSeq("brand", { seed: brandSeed }), 3), "BRD-100");
+
+    await Employee.collection.insertOne({ storeId: store, name: "E", email: "e@t.test", username: "e1", password: "x", role: "staff", employeeCode: "EMP-00007" });
+    const empSeed = () => maxNumericSuffix(Employee, "employeeCode", /^EMP-\d+$/);
+    assert.equal(formatNumber("EMP-", await nextSeq("employee", { seed: empSeed }), 5), "EMP-00008");
+  });
+});
+
 test("conditional stock decrement: 20 parallel orders for stock 5 → exactly 5 succeed, stock never negative", async (t) => {
   if (!connected) return t.skip("MongoDB not reachable");
   const store = new mongoose.Types.ObjectId();

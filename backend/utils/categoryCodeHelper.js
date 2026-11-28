@@ -1,30 +1,21 @@
 const Category = require("../models/Category");
+const { nextSeq, peekSeq, maxNumericSuffix } = require("./counter");
 
+const catSeed = () => maxNumericSuffix(Category, "category_code", /^cat_\d+$/i);
+
+/** Atomic next category code for the current store (optimizeplan §3.2). */
 const getNextCategoryCode = async () => {
-  // Sirf un categories ko dhundo jinka code "cat_" se shuru hota hai aur number par khatam hota hai
-  const categories = await Category.find({
-    category_code: /^cat_\d+$/i,
-  })
-    .select("category_code -_id")
-    .lean();
+  const seq = await nextSeq("category", { seed: catSeed });
+  return `cat_${seq}`;
+};
 
-  let highestNumber = 0;
-
-  for (const category of categories) {
-    const match = category.category_code?.match(/^cat_(\d+)$/i);
-
-    if (match) {
-      const number = Number(match[1]);
-      if (number > highestNumber) {
-        highestNumber = number;
-      }
-    }
-  }
-
-  // Highest number mein 1 add karke return karo (e.g., "cat_1", "cat_2")
-  return `cat_${highestNumber + 1}`;
+/** Preview only — does not consume a number. */
+const peekNextCategoryCode = async () => {
+  const seq = await peekSeq("category", { seed: catSeed });
+  return `cat_${seq}`;
 };
 
 module.exports = {
   getNextCategoryCode,
+  peekNextCategoryCode,
 };

@@ -22,6 +22,7 @@ const contactMessageSchema = new mongoose.Schema(
 
 // ── Multi-tenant ──
 contactMessageSchema.plugin(tenantScope);
+contactMessageSchema.index({ storeId: 1, createdAt: -1 });
 contactMessageSchema.index({ storeId: 1, status: 1, createdAt: -1 });
 
 module.exports = mongoose.model("ContactMessage", contactMessageSchema);

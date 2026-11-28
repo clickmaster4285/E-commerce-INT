@@ -301,18 +301,9 @@ const dealSchema = new mongoose.Schema(
   }
 );
 
-// ==========================================
-// INDEXES FOR PERFORMANCE
-// ==========================================
-dealSchema.index({ isActive: 1, startDate: 1, endDate: 1 });
-dealSchema.index({ type: 1 });
-dealSchema.index({ applyTo: 1 });
-dealSchema.index({ productIds: 1 });
-dealSchema.index({ categoryIds: 1 });
-dealSchema.index({ brandIds: 1 });
-
-
 // ── Multi-tenant ──
 dealSchema.plugin(tenantScope); // har store ka data alag (storeId)
+dealSchema.index({ storeId: 1, isActive: 1, endDate: 1 });
+dealSchema.index({ storeId: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Deal", dealSchema);

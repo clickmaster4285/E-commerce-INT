@@ -20,6 +20,7 @@ const subscriberSchema = new mongoose.Schema(
 // ── Multi-tenant ──
 subscriberSchema.plugin(tenantScope);
 subscriberSchema.index({ storeId: 1, email: 1 }, { unique: true });
+subscriberSchema.index({ storeId: 1, createdAt: -1 });
 subscriberSchema.index({ storeId: 1, status: 1, createdAt: -1 });
 
 subscriberSchema.statics.EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;

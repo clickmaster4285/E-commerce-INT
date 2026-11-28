@@ -195,21 +195,6 @@ async function requestWithRetry(batch, target) {
 }
 
 /**
- * Ek hi call me kai targets translate karo (locale wise).
- * @returns {Promise<Record<string,string[]|null>>} target -> texts
- */
-async function translateBatchMultiTarget(texts, targets = TARGET_LOCALES) {
-  const batch = texts.map((t) => String(t ?? "").trim()).filter(Boolean);
-  const result = {};
-
-  for (const target of targets) {
-    result[target] = await translateBatch(batch, target);
-  }
-
-  return result;
-}
-
-/**
  * Instance par `ur` model installed hai ya nahi — backfill script ke preflight
  * ke liye. `{ ok, targets, error }`
  */
@@ -274,6 +259,5 @@ module.exports = {
   BATCH_SIZE,
   isEnabled,
   translateBatch,
-  translateBatchMultiTarget,
   checkAvailability,
 };

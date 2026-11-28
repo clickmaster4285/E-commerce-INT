@@ -1,6 +1,6 @@
 const Variant = require("../models/Variant");
 const Tag = require("../models/Tag");
-const { getNextSku } = require("../utils/skuHelper");
+const { getNextSku, peekNextSku } = require("../utils/skuHelper");
 const { deleteImageFile } = require("../utils/uploadHelpers");
 const { isSameValue, isSameList } = require("../utils/activityHelper");
 
@@ -105,7 +105,8 @@ const createVariant = async (req, res) => {
 
 const getNextSkuNumber = async (req, res) => {
   try {
-    const sku = await getNextSku();
+    // Preview only — create paths call getNextSku() when they actually need a number.
+    const sku = await peekNextSku();
     res.status(200).json({ sku });
   } catch (error) {
     res.status(500).json({ message: error.message });
