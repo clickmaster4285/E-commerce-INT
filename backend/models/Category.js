@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const tenantScope = require("../utils/tenantScopePlugin");
+const softDeletePlugin = require("../utils/softDeletePlugin");
 
 const categoryAttributeSchema = new mongoose.Schema(
   {
@@ -107,5 +108,6 @@ categorySchema.index({ storeId: 1, "attributes.attribute_id": 1 });
 
 // ── Multi-tenant ──
 categorySchema.plugin(tenantScope); // har store ka data alag (storeId)
+categorySchema.plugin(softDeletePlugin);
 
 module.exports = mongoose.model("Category", categorySchema);

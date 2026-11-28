@@ -11,6 +11,7 @@ const log = require("../utils/logger");
 const { nextSeq, ensureSeeded, formatNumber, maxNumericSuffix } = require("../utils/counter");
 const { priceCheckout } = require("../services/pricing/checkout"); // server-side cart pricing
 const { withTx, TxAbort } = require("../utils/tx"); // one transaction per checkout
+const { upsertCustomerForUser } = require("../utils/linkUserCustomer");
 
 const emitOrderEvent = (event, data) => {
   try {
@@ -511,11 +512,25 @@ const placeOrder = async (req, res) => {
     }
 
     // ✅ Commit ke BAAD hi events (rollback hua order kabhi broadcast na ho)
+    if (req.store?._id && req.user) {
+      await upsertCustomerForUser({
+        storeId: req.store._id,
+        user: req.user,
+        addressSnapshot: address,
+      }).catch((err) => log.warn("upsertCustomerForUser after order:", err?.message || err));
+    }
     if (stockTouchedOnOrder.length > 0) {
       emitStockEvent({ variants: stockTouchedOnOrder, source: "order_placed" });
     }
     emitOrderEvent("order:created", { success: true, data: order });
     emitOrderEvent("order:updated", { success: true, data: order });
+    const itemQty = (order.items || []).reduce((sum, line) => sum + Math.max(0, Number(line.qty) || 0), 0);
+    setImmediate(() => {
+      try {
+        const { bumpStoreDaily } = require("../services/storeStats");
+        bumpStoreDaily({ revenue: Number(order.total) || 0, orders: 1, items: itemQty });
+      } catch (_) { /* fire-and-forget */ }
+    });
     res.status(201).json({ success: true, data: order });
   } catch (error) {
     log.error("❌ [placeOrder] Error:", error);

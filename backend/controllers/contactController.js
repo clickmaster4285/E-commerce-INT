@@ -4,6 +4,7 @@
 
 const mongoose = require("mongoose");
 const ContactMessage = require("../models/ContactMessage");
+const { escapeRegex } = require("../utils/escapeRegex");
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const fail = (res, status, message, extra = {}) => res.status(status).json({ success: false, message, ...extra });
@@ -53,7 +54,7 @@ exports.listMessages = async (req, res) => {
     if (["new", "read", "archived"].includes(req.query.status)) filter.status = req.query.status;
     const search = clip(req.query.search, 100);
     if (search) {
-      const rx = { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" };
+      const rx = { $regex: escapeRegex(search), $options: "i" };
       filter.$or = [{ name: rx }, { email: rx }, { message: rx }];
     }
     const [items, total, unread] = await Promise.all([

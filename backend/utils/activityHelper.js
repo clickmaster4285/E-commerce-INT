@@ -1,5 +1,60 @@
 const User = require("../models/User");
 const log = require("./logger");
+const audit = require("../services/audit");
+
+const CATEGORY_ENTITY = {
+  "Brand Management": "brand",
+  "Category Management": "category",
+  "Product Management": "product",
+  "Vendor Management": "vendor",
+  "Stock Management": "stock",
+  "Authentication": "auth",
+  "Employee Management": "employee",
+  "Store Management": "store",
+  "Order Management": "order",
+  "Coupon Management": "discount",
+};
+
+const inferAction = (activityData) => {
+  const text = String(activityData?.action || "").toLowerCase();
+  if (text.includes("created")) return "created";
+  if (text.includes("deleted")) return "deleted";
+  if (text.includes("updated") || text.includes("modified")) return "updated";
+  return "activity";
+};
+
+const pickEntityId = (details = {}) => {
+  if (!details || typeof details !== "object") return null;
+  return (
+    details.brandId
+    || details.categoryId
+    || details.vendorId
+    || details.productId
+    || details.orderId
+    || details.discountId
+    || details.dealId
+    || null
+  );
+};
+
+const auditFromActivity = (activityData, performerId) => {
+  const details = activityData?.details || {};
+  const category = activityData?.category || "";
+  audit.record({
+    entityType: CATEGORY_ENTITY[category] || String(category || "activity").toLowerCase().replace(/\s+/g, "_"),
+    entityId: pickEntityId(details),
+    action: inferAction(activityData),
+    actorType: "employee",
+    actorId: activityData?.performedBy || performerId || null,
+    actorName: activityData?.performedByName || "Admin",
+    changes: Array.isArray(activityData?.changes) ? activityData.changes : [],
+    meta: {
+      category,
+      summary: activityData?.action || "",
+      details,
+    },
+  });
+};
 
 const pushStoreActivity = async (storeId, req, action, summary, details = null) => {
   if (!storeId) return;
@@ -18,6 +73,15 @@ const pushStoreActivity = async (storeId, req, action, summary, details = null) 
  */
 const pushActivityToUser = async (userId, activityData) => {
   try {
+    audit.record({
+      entityType: "user",
+      entityId: userId || null,
+      action: String(activityData?.action || activityData?.type || "activity"),
+      actorType: "system",
+      actorId: userId || null,
+      actorName: activityData?.performedByName || "",
+      meta: activityData || {},
+    });
     if (!userId) return;
     await User.findByIdAndUpdate(userId, {
       $push: {
@@ -34,12 +98,16 @@ const pushActivityToUser = async (userId, activityData) => {
 };
 
 /**
- * REMOVED (optimizeplan.md §2.5): scanned User.role in [admin,staff,manager]
- * (User.role only allows "user"), wrote to a non-existent activities field on
- * every login/mutation, and leaked work into the hot path. §3.5 audit_events
- * replaces this. Kept as a no-op so existing call sites stay safe until removed.
+ * §3.5: purana User-scan wala global push hata diya — sirf audit_events me likhte hain.
+ * Embedded document pushes (Store.activity waghera) alag migration se aayenge.
  */
-const pushGlobalActivity = async () => {};
+const pushGlobalActivity = async (_io, activityData, performerId) => {
+  try {
+    auditFromActivity(activityData || {}, performerId);
+  } catch (err) {
+    log.debug?.("pushGlobalActivity audit skip:", err.message);
+  }
+};
 
 /**
  * Helper to compare old vs new data

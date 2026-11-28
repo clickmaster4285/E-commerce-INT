@@ -35,6 +35,7 @@
 
 const crypto = require("crypto");
 const log = require("./logger");
+const { escapeRegex } = require("./escapeRegex");
 const { TARGET_LOCALES, isEnabled, translateBatch } = require("./libreTranslate");
 
 // ==========================================
@@ -160,11 +161,11 @@ function cleanRepeatedProductTitle(text, productName) {
   let output = String(text || "");
   const title = String(productName || "").trim();
   if (!output || !title) return output;
-  const escapedTitle = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapedTitle = escapeRegex(title);
   const brand = title.match(/[A-Za-z]+(?:['’][A-Za-z]+)?/)?.[0];
   output = output.replace(new RegExp(escapedTitle, "gi"), " ");
   if (brand) {
-    const escapedBrand = brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const escapedBrand = escapeRegex(brand);
     output = output.replace(new RegExp(`(?:by|کی طرف سے|بذریعہ)\\s*${escapedBrand}\\.?`, "gi"), " ");
   }
   return output.replace(/[.،,:;\s]+/g, " ").trim();

@@ -7,21 +7,11 @@ const User = require("../models/User");
 const Employee = require("../models/Employee");
 const { queueTranslationSync } = require("../utils/translationService");
 const log = require("../utils/logger"); // catch blocks log.error use karte hain — pehle require hi nahi tha
-
-// ==========================================
-// 🔌 SOCKET HELPER (baqi controllers ki tarah)
-// Admin review actions (hide/unhide, response) sab connected
-// admin panels par live sync hote hain.
-// ==========================================
-const emitSocketEvent = (event, data) => {
-  try {
-    const { getIO } = require("../utils/socket");
-    const io = getIO();
-    if (io) io.emit(event, data);
-  } catch (error) {
-    console.error("⚠️ Review socket emit failed:", error.message);
-  }
-};
+const { emitSocketEvent } = require("../utils/emitSocketEvent");
+const { escapeRegex } = require("../utils/escapeRegex");
+const { parsePagination, paginationMeta } = require("../utils/paginate");
+const { ratingSummaryFromReviews } = require("../utils/ratingSummary");
+const { refreshAsync: refreshProductSummary } = require("../services/productSummary");
 
 // ==========================================
 // ⭐ PRODUCT REVIEWS (delivered orders only)
@@ -54,22 +44,6 @@ const reviewFilter = (productId) => ({
   status: "active",
   is_deleted: { $ne: true },
 });
-
-const calcSummary = (reviews) => {
-  const count = reviews.length;
-  const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-  let sum = 0;
-  reviews.forEach((r) => {
-    const rating = Number(r.rating) || 0;
-    sum += rating;
-    if (distribution[rating] !== undefined) distribution[rating] += 1;
-  });
-  return {
-    avg: count ? Math.round((sum / count) * 10) / 10 : 0,
-    count,
-    distribution,
-  };
-};
 
 // Populate review owners from both account collections. Older reviews can
 // reference an employee account even though the Review ref points to User.
@@ -109,8 +83,7 @@ const getProductReviews = async (req, res) => {
     if (!toObjectId(productId)) {
       return res.status(400).json({ success: false, message: "Invalid product ID" });
     }
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
+    const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 10, maxLimit: 50 });
     const ratingParam = parseInt(req.query.rating, 10);
     const sortKey = String(req.query.sort || "newest");
     const sortMap = {
@@ -131,7 +104,7 @@ const getProductReviews = async (req, res) => {
     const reviewsRaw = await Review.find(filter)
       .populate("user_id", "name avatar")
       .sort(sort)
-      .skip((page - 1) * limit)
+      .skip(skip)
       .limit(limit)
       .lean();
 
@@ -153,8 +126,9 @@ const getProductReviews = async (req, res) => {
 
     // ✅ Summary is computed from all reviews (not just the current page / filter)
     const allRatings = await Review.find(baseFilter).select("rating").lean();
-    const summary = calcSummary(allRatings);
+    const summary = ratingSummaryFromReviews(allRatings);
 
+    const { pages } = paginationMeta(page, limit, total);
     return res.status(200).json({
       success: true,
       summary,
@@ -163,7 +137,7 @@ const getProductReviews = async (req, res) => {
         total,
         page,
         limit,
-        pages: Math.max(1, Math.ceil(total / limit)),
+        pages,
         hasNext: page * limit < total,
         hasPrev: page > 1,
       },
@@ -268,6 +242,7 @@ const createReview = async (req, res) => {
       verifiedPurchase: true,
     });
     queueTranslationSync(Review, review._id);
+    refreshProductSummary(review.product_id);
 
     const populated = await Review.findById(review._id)
       .populate("user_id", "name avatar")
@@ -349,6 +324,7 @@ const updateReview = async (req, res) => {
 
     await review.save();
     queueTranslationSync(Review, review._id);
+    refreshProductSummary(review.product_id);
     await deleteReviewMediaFiles({ images: removedImages, videos: removedVideos });
     const populated = await Review.findById(review._id)
       .populate("user_id", "name avatar")
@@ -398,10 +374,12 @@ const deleteReview = async (req, res) => {
     if (!isOwner && !isStaff) {
       return res.status(403).json({ success: false, message: "You cannot delete this review" });
     }
+    const productId = review.product_id;
     review.is_deleted = true;
     review.deleted_at = new Date();
     await review.save();
     await deleteReviewMediaFiles(review);
+    refreshProductSummary(productId);
     return res.status(200).json({ success: true, message: "Review deleted" });
   } catch (error) {
     log.error("❌ [deleteReview] Error:", error.message);
@@ -428,6 +406,7 @@ const setReviewStatus = async (req, res) => {
     }
     review.status = status;
     await review.save();
+    refreshProductSummary(review.product_id);
     emitSocketEvent("reviewUpdated", {
       _id: review._id,
       product_id: review.product_id,
@@ -510,8 +489,7 @@ const deleteReviewResponse = async (req, res) => {
 // ==========================================
 const getAdminReviews = async (req, res) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 50 });
     const search = String(req.query.search || "").trim();
     const ratingParam = parseInt(req.query.rating, 10);
     const statusParam = String(req.query.status || "all");
@@ -530,7 +508,7 @@ const getAdminReviews = async (req, res) => {
       filter.rating = ratingParam;
     }
     if (search) {
-      const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const rx = new RegExp(escapeRegex(search), "i");
       filter.$or = [{ title: rx }, { comment: rx }];
     }
 
@@ -538,7 +516,7 @@ const getAdminReviews = async (req, res) => {
     const reviews = await Review.find(filter)
       .populate("product_id", "name translations")
       .sort(sort)
-      .skip((page - 1) * limit)
+      .skip(skip)
       .limit(limit)
       .lean();
     await hydrateReviewCustomers(reviews);
@@ -574,7 +552,7 @@ const getAdminReviews = async (req, res) => {
         total,
         page,
         limit,
-        pages: Math.max(1, Math.ceil(total / limit)),
+        pages: paginationMeta(page, limit, total).pages,
         hasNext: page * limit < total,
         hasPrev: page > 1,
       },

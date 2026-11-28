@@ -11,12 +11,12 @@ const Quote = require("../models/Quote");
 const Invoice = require("../models/Invoice");
 const syncLeadCustomer = require("../utils/syncLeadCustomer");
 
+const { escapeRegex } = require("../utils/escapeRegex");
 const enumValues = {
   lead_type: ["Individual", "Business"],
   source: ["Walk-in", "Phone Call", "WhatsApp", "Referral", "Email", "Social Media", "Other"],
   status: ["New", "Contacted", "Qualified", "Customer", "Converted", "Lost"],
 };
-const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // ==========================================
 // 🌐 LOCALE + SLIM HELPERS — admin leads (brands/banner/vendors/po ka pattern)
@@ -245,16 +245,7 @@ exports.getLead = async (req, res) => {
       .populate("history.employee_id", "name email")
       .populate("products.product_id", "name has_variants").populate("products.variant_id", "title sku selling_price").lean();
     if (!lead) return res.status(404).json({ success: false, message: "Lead not found" });
-    if (lead.status === "Customer" || lead.status === "Converted") {
-      const leadDocument = await Lead.findById(lead._id);
-      if (leadDocument) {
-        await syncLeadCustomer(leadDocument, actorId(req));
-        lead = await Lead.findOne({ _id: req.params.id, is_deleted: { $ne: true } })
-          .populate("assigned_employee_id", "name email phone").populate("category_id", "name").populate("activities.employee_id", "name email")
-          .populate("history.employee_id", "name email")
-          .populate("products.product_id", "name has_variants").populate("products.variant_id", "title sku selling_price").lean();
-      }
-    }
+    // ✅ GET par syncLeadCustomer nahi — convert/update par customer_id set hota hai (§3.6)
     // ✅ Internals aur bade non-front fields bahar — activities/history detail
     //    page ke timeline ke liye rakhe gaye hain.
     const { createdby, updatedby, is_deleted, deleted_at, ...cleanLead } = lead;
@@ -301,7 +292,6 @@ exports.updateLead = async (req, res) => {
     if (!(await validateReferences(payload, res))) return;
     const current = await Lead.findOne({ _id: req.params.id, is_deleted: { $ne: true } });
     if (!current) return res.status(404).json({ success: false, message: "Lead not found" });
-    if (current.status === "Customer" || current.status === "Converted") await syncLeadCustomer(current, actorId(req));
     if (payload.status === "Lost" && !["Contacted", "Qualified", "Lost"].includes(current.status)) return validationError(res, "Only contacted or qualified leads can be marked as lost");
     if (payload.status === "Customer" && !current.customer_added) return validationError(res, "Add the lead to Customers before setting this status");
     const mergedValidation = validatePayload({ ...current.toObject(), ...payload });

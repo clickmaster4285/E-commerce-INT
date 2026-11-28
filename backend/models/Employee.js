@@ -56,7 +56,8 @@ const employeeSchema = new mongoose.Schema(
       banners: { type: Boolean, default: true },
       manageStock: { type: Boolean, default: true },
       shipping: { type: Boolean, default: true },
-      // Single key — legacy `orders` merged via fixPermissions (§5.4)
+      // Canonical `orders` + legacy `order` (fixPermissions alias §5.4)
+      orders: { type: Boolean, default: true },
       order: { type: Boolean, default: true },
       attribute: { type: Boolean, default: true },
       vendors: { type: Boolean, default: true },

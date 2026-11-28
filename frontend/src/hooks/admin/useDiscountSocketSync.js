@@ -125,14 +125,8 @@ export default function useDiscountSocketSync(discountId) {
     socket.on("discount:updated", handleDiscountUpdated);
     socket.on("discount:deleted", handleDiscountDeleted);
 
-    // Old / alternative event names
-    socket.on("discountCreated", handleDiscountCreated);
-    socket.on("discountUpdated", handleDiscountUpdated);
-    socket.on("discountDeleted", handleDiscountDeleted);
-
     // Activity events
     socket.on("discount:activity", handleDiscountActivity);
-    socket.on("discountActivity", handleDiscountActivity);
 
     // ================================
     // Cleanup
@@ -142,12 +136,7 @@ export default function useDiscountSocketSync(discountId) {
       socket.off("discount:updated", handleDiscountUpdated);
       socket.off("discount:deleted", handleDiscountDeleted);
 
-      socket.off("discountCreated", handleDiscountCreated);
-      socket.off("discountUpdated", handleDiscountUpdated);
-      socket.off("discountDeleted", handleDiscountDeleted);
-
       socket.off("discount:activity", handleDiscountActivity);
-      socket.off("discountActivity", handleDiscountActivity);
     };
   }, [queryClient, discountId]);
 

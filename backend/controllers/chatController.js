@@ -11,7 +11,7 @@ const Cart = require("../models/Cart");
 const { consumeChatMessageRateLimit, CHAT_MESSAGE_RATE_LIMITED_MESSAGE } = require("../middleware/rateLimit");
 
 const MAX_MESSAGE_LENGTH = 4000;
-const escapeRegex = (value) => String(value || "").replace(/[-/\^$*+?.()|[\]{}]/g, "\\$&");
+const { escapeRegex } = require("../utils/escapeRegex");
 const roleOf = (req) => String(req.user?.role || "").toLowerCase();
 const isStaff = (req) => req.userType === "employee" && isStaffRole(roleOf(req)) && (isAdminRole(roleOf(req)) || req.user?.permissions?.order !== false);
 const isCustomer = (req) => req.userType === "user" && roleOf(req) === "user";

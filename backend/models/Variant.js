@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const tenantScope = require("../utils/tenantScopePlugin");
+const softDeletePlugin = require("../utils/softDeletePlugin");
 
 // Image information
 const imageSchema = new mongoose.Schema(
@@ -122,17 +123,17 @@ const variantSchema = new mongoose.Schema(
     },
     createdby: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Employee",
       default: null,
     },
     updatedby: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Employee",
       default: null,
     },
     deletedby: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Employee",
       default: null,
     },
     // Soft-delete (optimizeplan.md §2.5) — pehle field missing thi, is liye
@@ -154,6 +155,7 @@ variantSchema.index({ storeId: 1, product_id: 1, is_deleted: 1, created_at: 1, _
 
 // ── Multi-tenant ──
 variantSchema.plugin(tenantScope); // har store ka data alag (storeId)
+variantSchema.plugin(softDeletePlugin);
 // Case-insensitive SKU per store (collation strength 2)
 variantSchema.index(
   { storeId: 1, sku: 1 },

@@ -7,6 +7,8 @@ const User = require("../models/User");
 const Employee = require("../models/Employee");
 const { getNextCategoryCode, peekNextCategoryCode } = require("../utils/categoryCodeHelper");
 const { getIO } = require("../utils/socket");
+const { emitSocketEvent } = require("../utils/emitSocketEvent");
+const { escapeRegex } = require("../utils/escapeRegex");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 const { queueTranslationSync } = require("../utils/translationService");
 
@@ -94,15 +96,6 @@ const resolveCreatorInfo = async (rawId) => {
     return null;
   } catch (_) {
     return null;
-  }
-};
-
-const emitSocketEvent = (event, data) => {
-  try {
-    const io = getIO();
-    if (io) io.emit(event, data);
-  } catch (error) {
-    log.warn(`Socket emit failed for ${event}:`, error.message);
   }
 };
 
@@ -293,8 +286,6 @@ const assertValidParent = async ({ categoryId, parentId }) => {
 // categories hain, to ye category root (Parent = None) honi chahiye. Kisi aur
 // category ka child assign karna allowed nahi.
 // (Hardcoded nahi — ye rule har existing category par apply hota hai.)
-const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 const assertNameForcesRootParent = async ({ name, parentId, categoryId = null }) => {
   // ✅ UPDATED: Parent None (ya missing) hone par bhi check hota hai — taake
   // frontend bypass karke bhi koi existing Parent Category ke naam par nayi
@@ -303,7 +294,7 @@ const assertNameForcesRootParent = async ({ name, parentId, categoryId = null })
   if (!trimmedName) return;
 
   const query = {
-    name: { $regex: `^${escapeRegExp(trimmedName)}$`, $options: "i" },
+    name: { $regex: `^${escapeRegex(trimmedName)}$`, $options: "i" },
     is_deleted: false,
   };
   // Edit mein khud ko exclude karo (same name wali category = ye wali category)
@@ -497,6 +488,7 @@ const createCategory = async (req, res) => {
       performedBy: performerId,
       performedByName: performerName,
       details: {
+        categoryId: category._id,
         categoryCode: category.category_code,
         categoryName: category.name,
         parentCategoryId: category.parent_category_id,

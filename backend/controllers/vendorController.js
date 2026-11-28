@@ -8,8 +8,8 @@ const { auditEvent, diffFields } = require("../utils/auditHistory");
 const { withoutProtected } = require("../utils/sanitizeBody");
 // Balances sirf PO / payment flow se badalte hain — client body se kabhi nahi
 const VENDOR_PROTECTED = ["total_purchased", "total_paid", "balance_payable"];
-
-const escapeRegex = (v) => String(v).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const { escapeRegex } = require("../utils/escapeRegex");
+const { aggregateVendorBalances } = require("../utils/vendorBalance");
 
 // ==========================================
 // 🌐 LOCALE + SLIM HELPERS — admin vendors (brand/banner/orders ka exact pattern)
@@ -223,8 +223,8 @@ const getVendorWithPOs = async (req, res) => {
       .sort({ created_at: -1 })
       .limit(100)
       .lean();
-    const totalPurchased = pos.reduce((s, p) => s + (Number(p.total) || 0), 0);
-    const totalPaid = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    const { total_purchased: totalPurchased, total_paid: totalPaid, balance_payable: balancePayable } =
+      await aggregateVendorBalances(vendor._id);
 
     // ✅ Internals bahar — sirf front + audit + activity (timeline tab isi se chalta hai)
     const { translation_source, translation_status, deletedby, deleted_at, is_deleted, activity, createdby, updatedby, ...frontOnly } = vendor;
@@ -267,7 +267,7 @@ const getVendorWithPOs = async (req, res) => {
         ...responseVendor,
         total_purchased: totalPurchased,
         total_paid: totalPaid,
-        balance_payable: Math.max(0, totalPurchased - totalPaid),
+        balance_payable: balancePayable,
         purchaseOrders: pos.map(slimPurchaseOrder),
         payments: (() => {
           const poNumberById = new Map(pos.map((p) => [String(p._id), p.po_number || ""]));

@@ -1,7 +1,6 @@
 const Customer = require("../models/Customer");
 const Lead = require("../models/Lead");
-
-const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const { escapeRegex } = require("./escapeRegex");
 
 async function syncLeadCustomer(lead, actorId = null) {
   const customerName = lead.lead_type === "Business" && lead.company_name ? lead.company_name : lead.name;

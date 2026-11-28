@@ -13,6 +13,7 @@ const { invalidate } = require("../utils/publicCache");
 const { storeIdFor } = require("../utils/uploadPaths");
 const { publicTranslations, queueThemeTranslationSync } = require("../utils/themeTranslation");
 const crypto = require("crypto");
+const { extractLocaleRaw, normalizeLocale } = require("../utils/parseLocale");
 
 // Preview links: random token (sirf hash DB me) — max itne active per store
 const MAX_PREVIEW_LINKS = 5;
@@ -84,8 +85,8 @@ exports.getPublicTheme = async (req, res) => {
     res.set("ETag", etag);
     if (req.headers["if-none-match"] === etag) return res.status(304).end();
 
-    const localeRaw = String(req.query.locale || req.headers["x-lang"] || req.cookies?.lang || "").trim().toLowerCase();
-    const locale = /^[a-z]{2}/.test(localeRaw) ? localeRaw.slice(0, 2) : "";
+    const localeRaw = extractLocaleRaw(req);
+    const locale = /^[a-z]{2}/.test(localeRaw) ? normalizeLocale(localeRaw) : "";
     return res.status(200).json({
       success: true,
       // Slice to one locale when known (optimizeplan.md §9.2) — else all locales for backward compat

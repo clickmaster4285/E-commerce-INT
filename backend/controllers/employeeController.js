@@ -4,6 +4,8 @@ const User = require("../models/User");
 const Employee = require("../models/Employee");
 const { validatePhone } = require("../utils/phoneValidator");
 const log = require("../utils/logger");
+const { escapeRegex } = require("../utils/escapeRegex");
+const { parsePagination, paginationMeta } = require("../utils/paginate");
 const { nextSeq, formatNumber, maxNumericSuffix } = require("../utils/counter");
 
 const employeeCodeSeed = () => maxNumericSuffix(Employee, "employeeCode", /^EMP-\d+$/);
@@ -135,6 +137,7 @@ const fixPermissions = (oldPerms = {}) => ({
   banners: oldPerms?.banners ?? true,
   manageStock: oldPerms?.manageStock ?? true,
   shipping: oldPerms?.shipping ?? true,
+  orders: oldPerms?.orders ?? oldPerms?.order ?? true,
   order: oldPerms?.order ?? oldPerms?.orders ?? true,
   attribute: oldPerms?.attribute ?? true,
   vendors: oldPerms?.vendors ?? true,
@@ -180,6 +183,7 @@ const needsPermissionMigration = (perms) => {
     "banners",
     "manageStock",
     "shipping",
+    "orders",
     "order",
     "attribute",
     "vendors",
@@ -209,7 +213,6 @@ exports.getEmployeeOptions = async (req, res) => {
     const limit = legacyCap(req.query.limit, 20);
     const filter = { is_deleted: false, status: "active" };
     if (search) {
-      const { escapeRegex } = require("../utils/escapeRegex");
       const rx = escapeRegex(search);
       filter.$or = [
         { name: { $regex: rx, $options: "i" } },
@@ -231,7 +234,6 @@ exports.getAllEmployees = async (req, res) => {
   try {
     const limitRaw = parseInt(req.query.limit, 10);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 0; // 0 = legacy mode
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const search = String(req.query.search || "").trim();
     const statusFilter = String(req.query.status || "all").trim();
     const departmentFilter = String(req.query.department || "all").trim();
@@ -239,7 +241,6 @@ exports.getAllEmployees = async (req, res) => {
     const filter = { is_deleted: false, role: { $nin: ADMIN_ROLES } };
     const conditions = [];
     if (search) {
-      const { escapeRegex } = require("../utils/escapeRegex");
       const rx = escapeRegex(search);
       conditions.push({
         $or: [
@@ -282,19 +283,20 @@ exports.getAllEmployees = async (req, res) => {
     }
 
     // ---- PAGINATED MODE ----
+    const { page } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
     const total = await Employee.countDocuments(filter);
     const [activeCount, inactiveCount] = await Promise.all([
       Employee.countDocuments({ is_deleted: false, role: { $nin: ADMIN_ROLES }, status: "active" }),
       Employee.countDocuments({ is_deleted: false, role: { $nin: ADMIN_ROLES }, status: "inactive" }),
     ]);
-    const pages = Math.max(1, Math.ceil(total / limit));
+    const pages = paginationMeta(page, limit, total).pages;
     const safePage = Math.min(page, pages || 1);
-    const skip = (safePage - 1) * limit;
+    const skipActual = (safePage - 1) * limit;
 
     const employees = await Employee.find(filter)
       .select("name username email phone status department avatar translations translation_source translation_status")
       .sort({ created_at: -1 })
-      .skip(skip)
+      .skip(skipActual)
       .limit(limit)
       .lean();
 

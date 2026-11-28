@@ -17,6 +17,7 @@ const {
 } = require("../controllers/categoryController");
 
 const Category = require("../models/Category");
+const { escapeRegex } = require("../utils/escapeRegex");
 const { publicCache, invalidate } = require("../utils/publicCache");
 
 const router = express.Router();
@@ -73,9 +74,6 @@ const CATEGORY_SORT_FIELDS = {
   name: "name",
   created: "created_at",
 };
-
-// ✅ Search string ko safe regex banane ke liye (special chars se crash na ho)
-const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // ⚠️ `translations` / `translation_source` / `translation_status` ZAROORI hain:
 // frontend `nameOf()` / `descriptionOf()` inhi se localized value padhte hain.

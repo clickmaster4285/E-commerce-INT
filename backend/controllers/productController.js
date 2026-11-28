@@ -20,22 +20,14 @@ const { getNextSku } = require("../utils/skuHelper");
 const { deleteProductUploadFolder } = require("../utils/uploadHelpers");
 
 const { getIO } = require("../utils/socket");
+const { emitSocketEvent } = require("../utils/emitSocketEvent");
+const { escapeRegex } = require("../utils/escapeRegex");
+const { normalizeLocale } = require("../utils/parseLocale");
+const { ratingSummaryFromBuckets } = require("../utils/ratingSummary");
 const { pushGlobalActivity, isSameValue, isSameList } = require("../utils/activityHelper");
 const { queueTranslationSync } = require("../utils/translationService");
-
-// ======================================================
-// SOCKET HELPER
-// ======================================================
-const emitSocketEvent = (event, data) => {
-  try {
-    const io = getIO();
-    if (io) {
-      io.emit(event, data);
-    }
-  } catch (error) {
-    log.warn("⚠️ Socket emit failed:", error.message);
-  }
-};
+const { refreshAsync: refreshProductSummary } = require("../services/productSummary");
+const { adjustVariantQuantityToTarget } = require("../utils/variantQuantityAdjust");
 
 // ======================================================
 // JSON PARSER
@@ -72,13 +64,6 @@ const toBoolean = (value) => value === true || String(value).toLowerCase() === "
 // ======================================================
 const normalizeSku = (sku) => {
   return String(sku || "").trim();
-};
-
-// ======================================================
-// REGEX ESCAPER
-// ======================================================
-const escapeRegex = (value) => {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 };
 
 // ======================================================
@@ -267,23 +252,31 @@ const buildProductFilter = async (query = {}) => {
   else if (featuredFilter === "false" || featuredFilter === "0") filter.is_featured = false;
 
   if (search) {
-    const rx = { $regex: escapeRegex(search), $options: "i" };
+    const escaped = escapeRegex(search);
+    // §4.4 — prefix on denormalized search_text first; legacy $or for unbackfilled rows
+    const prefix = { $regex: `^${escaped}`, $options: "i" };
+    const rx = { $regex: escaped, $options: "i" };
     const [brandDocs, catDocs, variantDocs] = await Promise.all([
-      // ⚠️ Sirf ACTIVE brands ko search me include karo — disabled brand
-      // ke products storefront search me nahi aane chahiye
       Brand
         ? Brand.find({ name: rx, is_deleted: { $ne: true }, is_active: true }).select("_id").lean().catch(() => [])
         : Promise.resolve([]),
-      // ⚠️ Sirf ACTIVE categories ko search me include karo — disabled category
-      // ke products storefront search me nahi aane chahiye
       Category.find({ name: rx, is_deleted: { $ne: true }, is_active: true }).select("_id").lean().catch(() => []),
       Variant.find({ sku: rx, is_deleted: { $ne: true } }).select("product_id").lean().catch(() => []),
     ]);
-    filter.$or = [
+    const legacyOr = [
       { name: rx },
       { brand_id: { $in: brandDocs.map((b) => b._id) } },
       { category_id: { $in: catDocs.map((c) => c._id) } },
       { _id: { $in: variantDocs.map((v) => v.product_id) } },
+    ];
+    filter.$or = [
+      { search_text: prefix },
+      {
+        $and: [
+          { $or: [{ search_text: "" }, { search_text: { $exists: false } }, { search_text: null }] },
+          { $or: legacyOr },
+        ],
+      },
     ];
   }
 
@@ -782,6 +775,77 @@ const getAdminListVariantSummaries = async (productIds) => {
   return new Map(summaries.map((summary) => [String(summary._id), summary]));
 };
 
+// §4.4 — Product par denormalized summary ready?
+const productSummaryReady = (product) =>
+  Number(product?.variant_count) > 0 && product?.price_from != null;
+
+const summaryAsAdminVariantRow = (product) => ({
+  variantCount: Number(product.variant_count) || 0,
+  firstSku: "",
+  firstImageUrl: product.primary_image || "",
+  firstSellingPrice: Number(product.price_from) || 0,
+  firstQuantity: Number(product.stock_total) || 0,
+});
+
+/** Admin list: aggregate sirf jahan summary missing ya variant_count 0 + inventory detail chahiye */
+const resolveAdminVariantSummaries = async (products, adminInventory) => {
+  const map = new Map();
+  const aggIds = [];
+  for (const p of products) {
+    const id = String(p._id);
+    const variantCount = Number(p.variant_count) || 0;
+    if (productSummaryReady(p)) {
+      map.set(id, summaryAsAdminVariantRow(p));
+      continue;
+    }
+    if (variantCount === 0 && adminInventory) aggIds.push(p._id);
+    else if (variantCount > 0) aggIds.push(p._id);
+    else map.set(id, { variantCount: 0, firstSku: "", firstImageUrl: "", firstSellingPrice: 0, firstQuantity: 0 });
+  }
+  if (aggIds.length) {
+    const agg = await getAdminListVariantSummaries(aggIds);
+    for (const [k, v] of agg) map.set(k, v);
+  }
+  return map;
+};
+
+const publicSummaryExtras = (product) => ({
+  price_from: product.price_from,
+  price_to: product.price_to,
+  stock_total: product.stock_total,
+  in_stock: product.in_stock,
+  primary_image: product.primary_image,
+  rating_avg: product.rating_avg,
+  rating_count: product.rating_count,
+});
+
+const mapPublicListRow = (product, variantsMap, hasLocaleProjection, brandLocale, useSlimSummary) => {
+  const pid = String(product._id);
+  const base = {
+    ...(hasLocaleProjection ? projectProductLocale(product, brandLocale) : product),
+    ...publicSummaryExtras(product),
+  };
+  if (useSlimSummary && productSummaryReady(product)) {
+    const stubVariants = [{
+      selling_price: product.price_from,
+      quantity: product.stock_total,
+      images: product.primary_image ? [{ img_url: product.primary_image }] : [],
+    }];
+    return { ...base, variants: stubVariants, price: Number(product.price_from) || 0 };
+  }
+  const variants = variantsMap[pid] || [];
+  return {
+    ...base,
+    variants,
+    price: Number(variants[0]?.selling_price) || Number(product.price_from) || 0,
+  };
+};
+
+const variantIdsNeedingLoad = (products, isAdminView, slimList) => {
+  if (isAdminView || !slimList) return products.map((p) => p._id);
+  return products.filter((p) => !productSummaryReady(p)).map((p) => p._id);
+};
+
 const toAdminProductListRow = (product, variantSummary, locale, context = "products", includeInventory = false) => {
   const localized = projectLocaleFields(product, locale);
   const featuredContext = context === "featured" || context === "featured-manager";
@@ -806,15 +870,34 @@ const toAdminProductListRow = (product, variantSummary, locale, context = "produ
   if (!featuredContext) {
     productFields.description = product.description || "";
     productFields.tax = product.tax;
-    productFields.variantCount = variantSummary?.variantCount || 0;
+    // §3.4 — prefer denormalized summary when present
+    productFields.variantCount =
+      product.variant_count != null
+        ? product.variant_count
+        : variantSummary?.variantCount || 0;
+    productFields.price_from = product.price_from ?? null;
+    productFields.stock_total = product.stock_total ?? null;
+    productFields.in_stock = product.in_stock ?? null;
+    productFields.primary_image = product.primary_image || "";
+    productFields.rating_avg = product.rating_avg ?? 0;
+    productFields.rating_count = product.rating_count ?? 0;
   }
+  const imageUrl =
+    product.primary_image ||
+    variantSummary?.firstImageUrl ||
+    "";
   return {
     ...productFields,
-    variants: variantSummary
+    variants: variantSummary || product.price_from != null
       ? [{
-        sku: variantSummary.firstSku || "",
-        images: variantSummary.firstImageUrl ? [{ img_url: variantSummary.firstImageUrl }] : [],
-        ...(includeInventory ? { selling_price: variantSummary.firstSellingPrice || 0, quantity: variantSummary.firstQuantity || 0 } : {}),
+        sku: variantSummary?.firstSku || "",
+        images: imageUrl ? [{ img_url: imageUrl }] : [],
+        ...(includeInventory
+          ? {
+              selling_price: variantSummary?.firstSellingPrice ?? product.price_from ?? 0,
+              quantity: variantSummary?.firstQuantity ?? product.stock_total ?? 0,
+            }
+          : {}),
       }]
       : [],
   };
@@ -837,8 +920,8 @@ const getProducts = async (req, res) => {
     const adminInventory = adminList && String(req.query.admin_inventory || "") === "1";
     const adminListContext = String(req.query.admin_context || "products");
     const adminProductSelect = adminListContext === "featured" || adminListContext === "featured-manager"
-      ? "name translations category_id brand_id status is_featured"
-      : "name description translations category_id brand_id tax status is_featured";
+      ? "name translations category_id brand_id status is_featured variant_count price_from stock_total in_stock primary_image rating_avg rating_count"
+      : "name description translations category_id brand_id tax status is_featured variant_count price_from stock_total in_stock primary_image rating_avg rating_count";
     // Storefront always slim (no staff emails/tags). Admin keeps ?slim=1 opt-in.
     const slimList = !isAdminView || String(req.query.slim || "") === "1";
     // Public list variants: no cost_price / stock thresholds / audit (§9.2)
@@ -852,8 +935,7 @@ const getProducts = async (req, res) => {
     if (!isAdminView) filter.status = "active";
     const brandDetailList = String(req.query.brand_detail || "") === "1" && Boolean(req.query.brand_id);
     const hasLocaleProjection = typeof req.query.locale === "string" && req.query.locale.trim().length > 0;
-    const requestedBrandLocale = String(req.query.locale || "en").trim().toLowerCase();
-    const brandLocale = /^[a-z]{2}$/.test(requestedBrandLocale) ? requestedBrandLocale : "en";
+    const brandLocale = normalizeLocale(req.query.locale);
     // ✅ Shop facets (storefront) + BundleCard ids — legacy callers inhe bhejte hi nahi
     const shop = parseShopParams(req.query);
     if (shop.ids.length) {
@@ -906,6 +988,7 @@ const getProducts = async (req, res) => {
 
     // ---- LEGACY MODE (no limit, admin only) → exact old behavior ----
     if (!limit) {
+      const { legacyCap } = require("../utils/legacyListCap");
       const products = await Product.find(filter)
         .populate("category_id", CATEGORY_BRAND_POPULATE)
         .populate("brand_id", CATEGORY_BRAND_POPULATE)
@@ -913,6 +996,7 @@ const getProducts = async (req, res) => {
         .populate("createdby", "name email")
         .populate("updatedby", "name email")
         .sort(listSort)
+        .limit(legacyCap(req.query.limit, 50))
         .lean();
 
       if (!products.length) return res.status(200).json([]);
@@ -989,7 +1073,7 @@ const getProducts = async (req, res) => {
       const dOrder = new Map(pageIds.map((id, i) => [String(id), i]));
       dProducts.sort((a, b) => dOrder.get(String(a._id)) - dOrder.get(String(b._id)));
       if (adminList) {
-        const summaries = await getAdminListVariantSummaries(pageIds);
+        const summaries = await resolveAdminVariantSummaries(dProducts, adminInventory);
         return res.status(200).json({
           products: dProducts.map((product) => toAdminProductListRow(product, summaries.get(String(product._id)), brandLocale, adminListContext, adminInventory)),
           pagination: {
@@ -1002,23 +1086,22 @@ const getProducts = async (req, res) => {
           },
         });
       }
-      let dVarQuery = Variant.find({
-        product_id: { $in: pageIds },
-        is_deleted: { $ne: true },
-      }).sort({ created_at: 1, _id: 1 });
-      if (!isAdminView) dVarQuery = dVarQuery.select(PUBLIC_LIST_VARIANT_SELECT);
-      const dVariants = await dVarQuery.lean();
+      const dLoadIds = variantIdsNeedingLoad(dProducts, isAdminView, slimList);
       const dMap = {};
-      dVariants.forEach((v) => {
-        const pid = String(v.product_id);
-        (dMap[pid] = dMap[pid] || []).push(v);
-      });
+      if (dLoadIds.length) {
+        let dVarQuery = Variant.find({
+          product_id: { $in: dLoadIds },
+          is_deleted: { $ne: true },
+        }).sort({ created_at: 1, _id: 1 });
+        if (!isAdminView) dVarQuery = dVarQuery.select(PUBLIC_LIST_VARIANT_SELECT);
+        const dVariants = await dVarQuery.lean();
+        dVariants.forEach((v) => {
+          const pid = String(v.product_id);
+          (dMap[pid] = dMap[pid] || []).push(v);
+        });
+      }
       return res.status(200).json({
-        products: dProducts.map((p) => ({
-          ...(hasLocaleProjection ? projectProductLocale(p, brandLocale) : p),
-          variants: dMap[String(p._id)] || [],
-          price: Number((dMap[String(p._id)] || [])[0]?.selling_price) || 0,
-        })),
+        products: dProducts.map((p) => mapPublicListRow(p, dMap, hasLocaleProjection, brandLocale, slimList && !isAdminView)),
         pagination: {
           total: dTotal,
           page: dSafe,
@@ -1091,7 +1174,7 @@ const getProducts = async (req, res) => {
     products.sort((a, b) => orderMap.get(String(a._id)) - orderMap.get(String(b._id)));
 
     if (adminList) {
-      const summaries = await getAdminListVariantSummaries(pageIds);
+      const summaries = await resolveAdminVariantSummaries(products, adminInventory);
       const result = products.map((product) => toAdminProductListRow(product, summaries.get(String(product._id)), brandLocale, adminListContext, adminInventory));
       return res.status(200).json({
         products: result,
@@ -1107,24 +1190,22 @@ const getProducts = async (req, res) => {
       });
     }
 
-    let varQuery = Variant.find({
-      product_id: { $in: pageIds },
-      is_deleted: { $ne: true },
-    }).sort({ created_at: 1, _id: 1 });
-    if (!isAdminView) varQuery = varQuery.select(PUBLIC_LIST_VARIANT_SELECT);
-    const variants = await varQuery.lean();
-
+    const loadIds = variantIdsNeedingLoad(products, isAdminView, slimList);
     const variantsMap = {};
-    variants.forEach((v) => {
-      const pid = String(v.product_id);
-      (variantsMap[pid] = variantsMap[pid] || []).push(v);
-    });
+    if (loadIds.length) {
+      let varQuery = Variant.find({
+        product_id: { $in: loadIds },
+        is_deleted: { $ne: true },
+      }).sort({ created_at: 1, _id: 1 });
+      if (!isAdminView) varQuery = varQuery.select(PUBLIC_LIST_VARIANT_SELECT);
+      const variants = await varQuery.lean();
+      variants.forEach((v) => {
+        const pid = String(v.product_id);
+        (variantsMap[pid] = variantsMap[pid] || []).push(v);
+      });
+    }
 
-    const result = products.map((p) => ({
-      ...(hasLocaleProjection ? projectProductLocale(p, brandLocale) : p),
-      variants: variantsMap[String(p._id)] || [],
-      price: Number((variantsMap[String(p._id)] || [])[0]?.selling_price) || 0,
-    }));
+    const result = products.map((p) => mapPublicListRow(p, variantsMap, hasLocaleProjection, brandLocale, slimList && !isAdminView));
 
     return res.status(200).json({
       products: result,
@@ -1479,8 +1560,7 @@ const getProductById = async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
     const hasLocaleProjection = typeof req.query.locale === "string" && req.query.locale.trim().length > 0;
-    const requestedLocale = String(req.query.locale || "en").trim().toLowerCase();
-    const productLocale = /^[a-z]{2}$/.test(requestedLocale) ? requestedLocale : "en";
+    const productLocale = normalizeLocale(req.query.locale);
 
     // ⭐ Populate audit users so the Activity tab can show WHO created /
     // updated each variant by name (instead of a raw ObjectId).
@@ -1601,28 +1681,29 @@ const getProductById = async (req, res) => {
       log.error("⚠️ [getProductById] Variant tag healing skipped:", healErr?.message || healErr);
     }
 
-    // ⭐ Rating summary — for the stars + count on the detail page (reviews come from a separate endpoint)
+    // ⭐ Rating summary — Product denormalized fields; aggregate sirf jab backfill missing ho
     let ratingSummary = { avg: 0, count: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } };
-    try {
-      const Review = require("../models/Review");
-      // Har rating Node me load karne ke bajaye DB me $group (rating → count)
-      const buckets = await Review.aggregate([
-        { $match: { product_id: product._id, status: "active", is_deleted: { $ne: true } } },
-        { $group: { _id: "$rating", count: { $sum: 1 } } },
-      ]);
-      let sum = 0;
-      let count = 0;
-      buckets.forEach((b) => {
-        const rating = Number(b._id) || 0;
-        const n = Number(b.count) || 0;
-        sum += rating * n;
-        count += n;
-        if (ratingSummary.distribution[rating] !== undefined) ratingSummary.distribution[rating] += n;
-      });
-      ratingSummary.count = count;
-      ratingSummary.avg = count ? Math.round((sum / count) * 10) / 10 : 0;
-    } catch (summaryErr) {
-      log.error("⚠️ [getProductById] Rating summary skipped:", summaryErr?.message || summaryErr);
+    const distFromProduct = product.rating_dist && typeof product.rating_dist === "object"
+      ? { ...ratingSummary.distribution, ...product.rating_dist }
+      : null;
+    if (Number(product.rating_count) > 0 && distFromProduct) {
+      ratingSummary = {
+        avg: Number(product.rating_avg) || 0,
+        count: Number(product.rating_count) || 0,
+        distribution: distFromProduct,
+        dist: distFromProduct,
+      };
+    } else {
+      try {
+        const Review = require("../models/Review");
+        const buckets = await Review.aggregate([
+          { $match: { product_id: product._id, status: "active", is_deleted: { $ne: true } } },
+          { $group: { _id: "$rating", count: { $sum: 1 } } },
+        ]);
+        ratingSummary = ratingSummaryFromBuckets(buckets);
+      } catch (summaryErr) {
+        log.error("⚠️ [getProductById] Rating summary skipped:", summaryErr?.message || summaryErr);
+      }
     }
 
     return res.status(200).json({
@@ -1911,6 +1992,7 @@ const createProduct = async (req, res) => {
       created_at: populatedProduct?.created_at || createdProduct.created_at,
       updated_at: populatedProduct?.updated_at || createdProduct.updated_at,
     });
+    refreshProductSummary(createdProduct._id);
 
     return res.status(201).json({
       message: "Product created successfully",
@@ -2064,8 +2146,11 @@ const updateProduct = async (req, res) => {
     const variants = parseJSON(req.body.variants, null);
     let addedVariantCount = 0;
     let updatedVariantCount = 0;
+    let variantStockAdjusted = false;
 
     if (Array.isArray(variants)) {
+      const performerName = req.user?.name || "Admin";
+      const performerId = req.user?._id || null;
       const imageVariantIndexes = parseJSON(req.body.image_variant_indexes, []);
       const imagesByVariant = {};
 
@@ -2141,8 +2226,20 @@ const updateProduct = async (req, res) => {
           }
 
           if (item.quantity !== undefined) {
-            // ✅ Stock whole units mein hi rakhein (0.09 jaise decimals na aayein)
-            variant.quantity = Math.trunc(toNumber(item.quantity, 0));
+            const rawQty = Math.trunc(toNumber(item.quantity, 0));
+            const qtyResult = await adjustVariantQuantityToTarget({
+              variant,
+              newQty: rawQty,
+              performerId,
+              performerName,
+              reason: "product_variant_update",
+              explanation: `Stock set to ${rawQty} via product edit`,
+            });
+            if (!qtyResult.ok) {
+              return res.status(qtyResult.status || 400).json({ message: qtyResult.message });
+            }
+            if (qtyResult.changed) variantStockAdjusted = true;
+            variant.unmarkModified("quantity");
           }
 
           if (item.min_qnt !== undefined) {
@@ -2263,13 +2360,15 @@ const updateProduct = async (req, res) => {
         }
       }
 
-      // ✅ Live stock sync — product edit se variant quantity change hone par manage-stock
-      //    page socket se refresh ho jata hai (manual page refresh ki zaroorat nahi).
-      if (Array.isArray(variants) && variants.some((v) => v && Object.prototype.hasOwnProperty.call(v, "quantity"))) {
+      if (variantStockAdjusted) {
         emitSocketEvent("stockUpdated", {
           product_id: product._id,
           source: "product_variant_update",
         });
+        refreshProductSummary(product._id);
+      }
+      if (addedVariantCount > 0) {
+        refreshProductSummary(product._id);
       }
 
       // Variant soft-delete loop yahan nahi — official delete: DELETE /variants/:id

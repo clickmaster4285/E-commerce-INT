@@ -22,6 +22,7 @@ const log = require("../utils/logger");
 const { normalizePhone, isValidPhone } = require("../utils/phoneValidator");
 const { suggestUsernames, uniqueUsername } = require("../utils/username");
 const { validateStoreAddress, slugifySubdomain } = require("../utils/tenantHost");
+const { upsertCustomerForUser } = require("../utils/linkUserCustomer");
 
 /* Store web address check — format, reserved, kisi store ya doosre pending signup ne to nahi liya?
    @returns {{ error: string|null, suggestion: string }} */
@@ -1119,6 +1120,12 @@ const googleCustomerLogin = async (req, res) => {
       },
       user._id,
     );
+
+    if (req.store?._id) {
+      await upsertCustomerForUser({ storeId: req.store._id, user }).catch((err) => {
+        log.warn("upsertCustomerForUser after Google login:", err?.message || err);
+      });
+    }
 
     await tokens.issueSession(req, res, "user", user);
     res.json({

@@ -1,16 +1,12 @@
 const Banner = require("../models/Banner");
 const fs = require("fs");
 const { uploadUrlFor, localPathForUrl } = require("../utils/uploadPaths");
-const { getIO } = require("../utils/socket");
+const { emitSocketEvent } = require("../utils/emitSocketEvent");
+const { escapeRegex } = require("../utils/escapeRegex");
+const { parseLocale } = require("../utils/parseLocale");
+const { parsePagination, paginationMeta } = require("../utils/paginate");
 const { withoutProtected } = require("../utils/sanitizeBody"); // mass assignment guard
 const { queueTranslationSync } = require("../utils/translationService");
-
-const emitSocketEvent = (event, data) => {
-  try {
-    const io = getIO();
-    if (io) io.emit(event, data);
-  } catch (_) {}
-};
 
 // Banner image paths DB me bina leading slash: "uploads/stores/<id>/banners/x.webp"
 const storedPath = (file) => uploadUrlFor(file.path).slice(1);
@@ -27,11 +23,6 @@ const deleteFile = (filePath) => {
 // getBrandById / getBrandsAdmin ka exact pattern: sirf selected locale ki
 // translation return karo, poori translations map nahi.
 // ==========================================
-const parseLocale = (value) => {
-  const requestedLocale = String(value || "en").trim().toLowerCase();
-  return /^[a-z]{2}$/.test(requestedLocale) ? requestedLocale : "en";
-};
-
 // ✅ Selected locale ki slim translation object (brand paginated response jaisa).
 const slimBannerTranslations = (banner, locale) => {
   if (locale === "en" || !banner.translations) return null;
@@ -86,7 +77,7 @@ const frontBannerFields = (banner) => ({
 // ==========================================
 exports.getBanner = async (req, res) => {
   try {
-    const locale = parseLocale(req.query.locale);
+    const locale = parseLocale(req);
     const banner = await Banner.findById(req.params.id)
       .select("title translations bannerType status position startDate endDate eyebrow heading description altText backgroundColor primaryButton secondaryButton displayRules desktopImage tabletImage mobileImage createdAt updatedAt createdby updatedby")
       .populate("createdby", "name email")
@@ -120,9 +111,6 @@ const BANNER_SORT_FIELDS = {
   created: "createdAt",
 };
 
-// ✅ Search string ko safe regex banane ke liye (special chars se crash na ho)
-const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 // ==========================================
 // 🛡️ GET ALL BANNERS — ADMIN / STOREFRONT
 // getBrandsAdmin ka exact pattern:
@@ -155,10 +143,12 @@ exports.getAllBanners = async (req, res) => {
     }
 
     // ---- SERVER SIDE PAGINATION (brand admin list ka exact pattern) ----
-    const requestedPage = Math.max(1, parseInt(page, 10) || 1);
-    const limitNum = Math.min(100, Math.max(1, limitRaw));
+    const { page: requestedPage, limit: limitNum } = parsePagination(
+      { page, limit: limitRaw },
+      { defaultLimit: 20, maxLimit: 100 }
+    );
 
-    const locale = parseLocale(req.query.locale);
+    const locale = parseLocale(req);
 
     // ✅ Sorting bhi server par hoti hai (whitelist ke ilawa koi custom field nahi)
     const sortKeyRaw = String(req.query.sort || "").trim();
@@ -169,7 +159,7 @@ exports.getAllBanners = async (req, res) => {
     const sortOrder = hasSort ? (rawOrder === "desc" ? -1 : 1) : 1;
 
     const total = await Banner.countDocuments(buildFilter());
-    const pages = Math.max(1, Math.ceil(total / limitNum));
+    const { pages } = paginationMeta(requestedPage, limitNum, total);
     const safePage = Math.min(requestedPage, pages);
 
     const [banners, totalBanners, activeBanners, inactiveBanners, scheduledBanners, expiredBanners, draftBanners, typeList, positionList] =
@@ -297,7 +287,6 @@ exports.createBanner = async (req, res) => {
     queueTranslationSync(Banner, banner._id);
 
     emitSocketEvent("banner:created", { success: true, data: banner });
-    emitSocketEvent("bannerCreated", { success: true, data: banner });
 
     res.status(201).json({ success: true, data: banner });
   } catch (err) {
@@ -359,7 +348,6 @@ exports.updateBanner = async (req, res) => {
     queueTranslationSync(Banner, updated._id);
 
     emitSocketEvent("banner:updated", { success: true, data: updated });
-    emitSocketEvent("bannerUpdated", { success: true, data: updated });
 
     res.json({ success: true, data: updated });
   } catch (err) {
@@ -406,7 +394,6 @@ exports.duplicateBanner = async (req, res) => {
     queueTranslationSync(Banner, newBanner._id);
 
     emitSocketEvent("banner:created", { success: true, data: newBanner });
-    emitSocketEvent("bannerCreated", { success: true, data: newBanner });
 
     res.status(201).json({ success: true, data: newBanner });
   } catch (err) {
@@ -422,7 +409,6 @@ exports.deleteBanner = async (req, res) => {
     await Banner.findByIdAndDelete(req.params.id);
 
     emitSocketEvent("banner:deleted", { success: true, data: { id: req.params.id } });
-    emitSocketEvent("bannerDeleted", { success: true, data: { id: req.params.id } });
 
     res.json({ success: true, message: "Deleted successfully" });
   } catch (err) {

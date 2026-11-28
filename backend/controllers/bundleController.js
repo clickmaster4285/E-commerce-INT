@@ -4,6 +4,7 @@ const Variant = require("../models/Variant");
 const path = require("path");
 const fs = require("fs-extra");
 const log = require("../utils/logger");
+const { escapeRegex } = require("../utils/escapeRegex");
 
 const { uploadDirFor } = require("../utils/uploadPaths");
 const IMAGE_FOLDER = path.join(__dirname, "../uploads/bundles"); // purana shared folder
@@ -244,8 +245,8 @@ const getBundles = async (req, res) => {
     const filter = {};
     if (String(search).trim()) {
       filter.$or = [
-        { name: { $regex: require("../utils/escapeRegex").escapeRegex(String(search).trim()), $options: "i" } },
-        { description: { $regex: require("../utils/escapeRegex").escapeRegex(String(search).trim()), $options: "i" } },
+        { name: { $regex: escapeRegex(String(search).trim()), $options: "i" } },
+        { description: { $regex: escapeRegex(String(search).trim()), $options: "i" } },
       ];
     }
     if (status === "active") filter.isActive = true;

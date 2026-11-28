@@ -55,18 +55,12 @@ export default function useBannerSocketSync() {
     socket.on("banner:created", handleBannerCreated);
     socket.on("banner:updated", handleBannerUpdated);
     socket.on("banner:deleted", handleBannerDeleted);
-    socket.on("bannerCreated", handleBannerCreated);
-    socket.on("bannerUpdated", handleBannerUpdated);
-    socket.on("bannerDeleted", handleBannerDeleted);
     socket.on("bannerToggled", handleBannerUpdated);
 
     return () => {
       socket.off("banner:created", handleBannerCreated);
       socket.off("banner:updated", handleBannerUpdated);
       socket.off("banner:deleted", handleBannerDeleted);
-      socket.off("bannerCreated", handleBannerCreated);
-      socket.off("bannerUpdated", handleBannerUpdated);
-      socket.off("bannerDeleted", handleBannerDeleted);
       socket.off("bannerToggled", handleBannerUpdated);
     };
   }, [queryClient]);

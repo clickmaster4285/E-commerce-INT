@@ -77,7 +77,7 @@ export function useUserSocketSync({ enabled = true } = {}) {
     });
 
     // 3. DISCOUNTS
-    on(["discount:activity", "discountCreated", "discountUpdated", "discountDeleted"], (payload) => {
+    on(["discount:activity", "discount:created", "discount:updated", "discount:deleted"], (payload) => {
       const id = idOf(payload);
       if (id) invalidate(["discount", id]);
       invalidate(["discounts"], ["activeDiscounts"], ["products"], ["deals"]);
@@ -102,7 +102,7 @@ export function useUserSocketSync({ enabled = true } = {}) {
     });
 
     // 7. BANNERS
-    on(["banner:created", "banner:updated", "banner:deleted", "bannerCreated", "bannerUpdated", "bannerDeleted"], (payload) => {
+    on(["banner:created", "banner:updated", "banner:deleted"], (payload) => {
       const id = idOf(payload);
       if (id) invalidate(["banner", id]);
       invalidate(["banners"], ["activeBanners"]);

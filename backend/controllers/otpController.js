@@ -13,6 +13,7 @@ const { storeAdminBaseUrl } = require("../utils/storeUrl");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity } = require("../utils/activityHelper");
 const log = require("../utils/logger");
+const { upsertCustomerForUser } = require("../utils/linkUserCustomer");
 
 // ==========================================
 // ⚙️ OTP CONFIG (sirf env se — koi hardcoded fallback nahi)
@@ -393,6 +394,9 @@ const verifyEmailVerificationOtp = async (req, res) => {
           role: "user",
           emailVerified: true,
           status: "active",
+        });
+        await upsertCustomerForUser({ storeId: req.store._id, user: customer }).catch((err) => {
+          log.warn("upsertCustomerForUser after signup:", err?.message || err);
         });
         await PendingRegistration.deleteOne({ _id: pending._id });
         await setAuthCookies(req, res, customer);

@@ -7,8 +7,8 @@ const Subscriber = require("../models/Subscriber");
 
 const fail = (res, status, message, extra = {}) => res.status(status).json({ success: false, message, ...extra });
 
+const { escapeRegex } = require("../utils/escapeRegex");
 const normalizeEmail = (v) => String(v || "").trim().toLowerCase().slice(0, 254);
-const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // ── PUBLIC: POST /newsletter/subscribe { email, locale? } ──
 // Pehle se subscribed ho to bhi 200 (email enumerate na ho sake)

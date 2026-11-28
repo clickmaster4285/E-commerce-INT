@@ -2,18 +2,12 @@ const Deal = require("../models/Deal");
 const log = require("../utils/logger");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
-const { getIO } = require("../utils/socket");
+const { emitSocketEvent } = require("../utils/emitSocketEvent");
+const { escapeRegex } = require("../utils/escapeRegex");
 const { queueTranslationSync } = require("../utils/translationService");
 const { withoutProtected } = require("../utils/sanitizeBody");
 // Client usedCount / createdBy / storeId wagaira set na kar sake (mass assignment)
 const DEAL_PROTECTED = ["usedCount"];
-
-const emitSocketEvent = (event, data) => {
-  try {
-    const io = getIO();
-    if (io) io.emit(event, data);
-  } catch (_) {}
-};
 
 // ==========================================
 // ✅ CREATEDBY / UPDATEDBY RESOLUTION
@@ -28,8 +22,6 @@ const ACTOR_FIELDS = "name email role";
 
 // ✅ SEARCH SAFETY — user ka text seedha $regex me chala jata tha, is liye "." ya "["
 //    jaise special characters query bigaad (ya slow) kar dete thay.
-const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 const resolveActor = async (rawId) => {
   if (!rawId) return null;
   // Pehle se populated (User/Employee document) → waisa hi return karo
@@ -153,7 +145,6 @@ const createDeal = async (req, res) => {
     queueTranslationSync(Deal, deal._id);
 
     emitSocketEvent("deal:created", { success: true, data: deal });
-    emitSocketEvent("dealCreated", { success: true, data: deal });
 
     res.status(201).json({
       success: true,
@@ -190,7 +181,7 @@ const getDeals = async (req, res) => {
 
     const now = new Date();
     const searchTerm = String(search).trim();
-    const safeSearch = searchTerm ? escapeRegExp(searchTerm) : "";
+    const safeSearch = searchTerm ? escapeRegex(searchTerm) : "";
 
     // ==========================================
     // BASE CLAUSES (search + type + applyTo)
@@ -477,7 +468,6 @@ const updateDeal = async (req, res) => {
     const dealPayload = await resolveDealActors(updatedDeal);
 
     emitSocketEvent("deal:updated", { success: true, data: dealPayload });
-    emitSocketEvent("dealUpdated", { success: true, data: dealPayload });
 
     res.status(200).json({
       success: true,
@@ -514,7 +504,6 @@ const deleteDeal = async (req, res) => {
     await Deal.findByIdAndDelete(id);
 
     emitSocketEvent("deal:deleted", { success: true, data: { id } });
-    emitSocketEvent("dealDeleted", { success: true, data: { id } });
 
     res.status(200).json({
       success: true,
@@ -558,7 +547,6 @@ const toggleDealStatus = async (req, res) => {
     await deal.save();
 
     emitSocketEvent("deal:updated", { success: true, data: deal });
-    emitSocketEvent("dealUpdated", { success: true, data: deal });
 
     res.status(200).json({
       success: true,

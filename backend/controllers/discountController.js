@@ -4,16 +4,10 @@ const Employee = require("../models/Employee");
 const Product = require("../models/Product");
 const Category = require("../models/Category");
 const Brand = require("../models/Brand");
-const { getIO } = require("../utils/socket");
+const { emitSocketEvent } = require("../utils/emitSocketEvent");
+const { escapeRegex } = require("../utils/escapeRegex");
 const log = require("../utils/logger");
 const { queueTranslationSync } = require("../utils/translationService");
-
-const emitSocketEvent = (event, data) => {
-  try {
-    const io = getIO();
-    if (io) io.emit(event, data);
-  } catch (_) {}
-};
 
 // createdBy/updatedBy creator User ya Employee dono ho sakta hai.
 // Model ref sirf User hai, isliye populate fail hone par Employee se resolve karo.
@@ -304,7 +298,6 @@ exports.createDiscount = async (req, res) => {
     // SOCKET
     // ===================================================
     emitSocketEvent("discount:created", newDiscount);
-    emitSocketEvent("discountCreated", newDiscount);
 
     return res.status(201).json({
       message: "Discount created successfully",
@@ -348,8 +341,8 @@ exports.getDiscounts = async (req, res) => {
     if (search) {
       andClauses.push({
         $or: [
-          { name: { $regex: require("../utils/escapeRegex").escapeRegex(search), $options: "i" } },
-          { code: { $regex: require("../utils/escapeRegex").escapeRegex(search), $options: "i" } },
+          { name: { $regex: escapeRegex(search), $options: "i" } },
+          { code: { $regex: escapeRegex(search), $options: "i" } },
         ],
       });
     }
@@ -780,7 +773,6 @@ exports.updateDiscount = async (req, res) => {
     const payload = (await buildDiscountResponse(updatedDiscount._id)) || updatedDiscount.toObject();
 
     emitSocketEvent("discount:updated", payload);
-    emitSocketEvent("discountUpdated", payload);
 
     return res.status(200).json({
       message: "Discount updated successfully",
@@ -819,7 +811,6 @@ exports.deleteDiscount = async (req, res) => {
     }
 
     emitSocketEvent("discount:deleted", req.params.id);
-    emitSocketEvent("discountDeleted", req.params.id);
 
     return res.status(200).json({ message: "Discount deleted successfully" });
   } catch (error) {

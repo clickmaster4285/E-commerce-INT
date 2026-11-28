@@ -113,9 +113,9 @@ test("password fields use select:false", () => {
   assert.equal(SuperAdmin.schema.path("passwordHash").options.select, false);
 });
 
-test("Employee schema has order but not orders permission key", () => {
-  assert.ok(Employee.schema.path("permissions.order"));
-  assert.equal(Employee.schema.path("permissions.orders"), undefined);
+test("Employee schema has canonical orders plus legacy order alias", () => {
+  assert.ok(Employee.schema.path("permissions.orders"), "canonical orders");
+  assert.ok(Employee.schema.path("permissions.order"), "legacy order alias");
 });
 
 test("Address has tenantScope + storeId", () => {

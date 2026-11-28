@@ -12,6 +12,7 @@ const tokens = require("../utils/tokens");
 const { logActivity, activityRow, clientInfo } = require("../utils/superAdminActivity");
 const SuperAdminActivity = require("../models/SuperAdminActivity");
 const { storeAdminBaseUrl } = require("../utils/storeUrl");
+const { escapeRegex } = require("../utils/escapeRegex");
 
 // Seller ka employee: application ke store me (resume-flow wale purane records
 // bina storeId ke bhi ho sakte hain — woh seller_pending se pehchane jate hain)
@@ -268,7 +269,7 @@ const listRequests = async (req, res) => {
       filter.status = String(status);
     }
     if (search) {
-      const pattern = new RegExp(String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const pattern = new RegExp(escapeRegex(String(search).trim()), "i");
       filter.$or = [
         { name: pattern },
         { email: pattern },
@@ -683,7 +684,7 @@ const listStores = async (req, res) => {
       filter.store_status = String(status);
     }
     if (search) {
-      const pattern = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const pattern = new RegExp(escapeRegex(String(search)), "i");
       filter.$or = [{ store_name: pattern }, { email: pattern }];
     }
 
@@ -1092,7 +1093,7 @@ const listUsers = async (req, res) => {
     if (role && String(role) === "user") filter.role = "user";
     if (status && ["active", "blocked", "inactive"].includes(String(status))) filter.status = String(status);
     if (search) {
-      const pattern = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const pattern = new RegExp(escapeRegex(String(search)), "i");
       filter.$or = [{ name: pattern }, { email: pattern }, { username: pattern }];
     }
 
@@ -1167,7 +1168,7 @@ const listStoreAdmins = async (req, res) => {
     const filter = { ...base };
     if (["active", "inactive"].includes(String(status))) filter.status = String(status);
     if (search) {
-      const pattern = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const pattern = new RegExp(escapeRegex(String(search)), "i");
       filter.$or = [{ name: pattern }, { email: pattern }, { username: pattern }, { phone: pattern }];
     }
 
@@ -1740,7 +1741,7 @@ const activityFeed = async (actorId, query = {}) => {
   const base = { "actor.id": actorId };
   const filter = { ...base };
   if (type && ACTIVITY_TYPES.includes(String(type))) filter.entityType = String(type);
-  if (search) filter.action = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+  if (search) filter.action = new RegExp(escapeRegex(String(search)), "i");
 
   const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
   const startOfWeek = new Date(startOfDay); startOfWeek.setDate(startOfWeek.getDate() - 6);
@@ -1844,7 +1845,7 @@ const planEntityActivityFeed = async (planId, query = {}) => {
   const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 25));
   const base = { entityType: "plan", entityId: String(planId) };
   const filter = { ...base };
-  if (search) filter.action = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+  if (search) filter.action = new RegExp(escapeRegex(String(search)), "i");
 
   const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
   const startOfWeek = new Date(startOfDay); startOfWeek.setDate(startOfWeek.getDate() - 6);
@@ -1952,7 +1953,7 @@ const listPlans = async (req, res) => {
     const filter = {};
     if (["active", "inactive"].includes(String(status || ""))) filter.status = String(status);
     if (search) {
-      const pattern = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const pattern = new RegExp(escapeRegex(String(search)), "i");
       filter.$or = [{ name: pattern }, { slug: pattern }, { description: pattern }];
     }
 
@@ -1994,7 +1995,7 @@ const listPlanOptions = async (req, res) => {
     const limit = legacyCap(req.query.limit, 50);
     const filter = {};
     if (search) {
-      const pattern = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const pattern = new RegExp(escapeRegex(String(search)), "i");
       filter.$or = [{ name: pattern }, { slug: pattern }];
     }
     const plans = await Plan.find(filter)

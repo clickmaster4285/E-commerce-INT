@@ -1,5 +1,6 @@
   const mongoose = require("mongoose");
 const tenantScope = require("../utils/tenantScopePlugin");
+const softDeletePlugin = require("../utils/softDeletePlugin");
 
   const brandSchema = new mongoose.Schema(
     {
@@ -147,5 +148,6 @@ const tenantScope = require("../utils/tenantScopePlugin");
 
 // ── Multi-tenant ──
 brandSchema.plugin(tenantScope); // har store ka data alag (storeId)
+brandSchema.plugin(softDeletePlugin);
 
   module.exports = mongoose.model("Brand", brandSchema);

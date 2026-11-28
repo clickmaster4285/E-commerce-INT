@@ -3,15 +3,10 @@ const Tag = require("../models/Tag");
 const { getNextSku, peekNextSku } = require("../utils/skuHelper");
 const { deleteImageFile } = require("../utils/uploadHelpers");
 const { isSameValue, isSameList } = require("../utils/activityHelper");
-
-// ✅ Live stock sync — variant quantity change par manage-stock page socket se refresh ho
-//    jata hai (manual page refresh ki zaroorat nahi).
-const emitSocketEvent = (event, data) => {
-  try {
-    const io = require("../utils/socket").getIO();
-    if (io) io.emit(event, data);
-  } catch (_) {}
-};
+const { refreshAsync: refreshProductSummary } = require("../services/productSummary");
+const { adjustVariantQuantityToTarget } = require("../utils/variantQuantityAdjust");
+const { emitSocketEvent } = require("../utils/emitSocketEvent");
+const { escapeRegex } = require("../utils/escapeRegex");
 
 // ⭐ TAG RESOLVER (Find or Create): ensures each tag name has a Tag document
 // (with createdby tracked) so the Tags tab can show who created it.
@@ -91,6 +86,7 @@ const createVariant = async (req, res) => {
     });
 
     emitSocketEvent("productUpdated", { _id: variant.product_id, variantUpdated: true });
+    refreshProductSummary(variant.product_id);
 
     res.status(201).json({
       message: "Variant created successfully",
@@ -138,7 +134,7 @@ const getVariantPicker = async (req, res) => {
     const limit = legacyCap(req.query.limit, 20);
     const filter = { is_deleted: { $ne: true }, status: { $ne: "inactive" } };
     if (search) {
-      const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const rx = new RegExp(escapeRegex(search), "i");
       filter.$or = [{ sku: rx }, { title: rx }];
     }
     const variants = await Variant.find(filter)
@@ -200,10 +196,10 @@ const updateVariant = async (req, res) => {
     if (req.body.expiry_after_delivery_unit !== undefined) {
       variant.expiry_after_delivery_unit = req.body.expiry_after_delivery_unit;
     }
-    // ✅ Live-update ke liye quantity ka purana value pakad le rahe hain
-    const previousQuantity = variant.quantity ?? 0;
+    let stockChanged = false;
+    let productIdForSummary = variant.product_id?._id || variant.product_id || null;
     if (req.body.selling_price !== undefined) variant.selling_price = Number(req.body.selling_price);
-    // ✅ Stock poore units mein — decimal bhejne par 400 error (silent fractional stock nahi)
+    // ✅ Stock — direct overwrite nahi; $inc + StockHistory (§4.1)
     if (req.body.quantity !== undefined) {
       const rawQuantity = Number(req.body.quantity);
       if (!Number.isFinite(rawQuantity) || !Number.isInteger(rawQuantity) || rawQuantity < 0) {
@@ -211,7 +207,23 @@ const updateVariant = async (req, res) => {
           message: "Quantity must be a valid non-negative whole number",
         });
       }
-      variant.quantity = rawQuantity;
+      const performerName = req.user?.name || "Admin";
+      const performerId = req.user?._id || null;
+      const qtyResult = await adjustVariantQuantityToTarget({
+        variant,
+        newQty: rawQuantity,
+        performerId,
+        performerName,
+        reason: "variant_update",
+        explanation: `Stock set to ${rawQuantity} via variant edit`,
+      });
+      if (!qtyResult.ok) {
+        return res.status(qtyResult.status || 400).json({ message: qtyResult.message });
+      }
+      stockChanged = qtyResult.changed;
+      productIdForSummary = qtyResult.productId || productIdForSummary;
+      // quantity DB me $inc se ho chuki — save() se dobara overwrite na ho
+      variant.unmarkModified("quantity");
     }
     if (req.body.min_qnt !== undefined) variant.min_qnt = Number(req.body.min_qnt);
     if (req.body.max_qnt !== undefined) variant.max_qnt = Number(req.body.max_qnt);
@@ -269,16 +281,16 @@ const updateVariant = async (req, res) => {
           variantUpdated: true,
         });
       }
+    }
 
-      // ✅ Stock quantity sach me badli ho to live update emit (manage-stock auto refresh)
-      if ((variant.quantity ?? 0) !== previousQuantity) {
-        emitSocketEvent("stockUpdated", {
-          variant_id: variant._id,
-          product_id: variant.product_id?._id || variant.product_id || null,
-          quantity: variant.quantity ?? 0,
-          source: "variant_update",
-        });
-      }
+    if (stockChanged) {
+      emitSocketEvent("stockUpdated", {
+        variant_id: variant._id,
+        product_id: productIdForSummary,
+        quantity: variant.quantity ?? 0,
+        source: "variant_update",
+      });
+      refreshProductSummary(productIdForSummary);
     }
 
     res.status(200).json({
@@ -301,6 +313,8 @@ const deleteVariant = async (req, res) => {
       return res.status(404).json({ message: "Variant not found" });
     }
 
+    const productId = variant.product_id;
+
     // Physical images delete
     for (const image of variant.images) {
       await deleteImageFile(image.img_url);
@@ -308,7 +322,8 @@ const deleteVariant = async (req, res) => {
 
     await Variant.findByIdAndDelete(req.params.id);
 
-    emitSocketEvent("productUpdated", { _id: variant.product_id, variantUpdated: true });
+    emitSocketEvent("productUpdated", { _id: productId, variantUpdated: true });
+    refreshProductSummary(productId);
 
     res.status(200).json({ message: "Variant deleted successfully" });
   } catch (error) {

@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const tenantScope = require("../utils/tenantScopePlugin");
+const softDeletePlugin = require("../utils/softDeletePlugin");
 
 const auditChangeSchema = new mongoose.Schema({ field: String, before: String, after: String }, { _id: false });
 const activitySchema = new mongoose.Schema({ type: { type: String, required: true }, at: { type: Date, default: Date.now }, actor_id: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null }, actor_name: { type: String, default: "Administrator" }, changes: { type: [auditChangeSchema], default: [] } }, { _id: false });
@@ -91,5 +92,6 @@ vendorSchema.methods.restore = async function () {
 
 // ── Multi-tenant ──
 vendorSchema.plugin(tenantScope); // har store ka data alag (storeId)
+vendorSchema.plugin(softDeletePlugin);
 
 module.exports = mongoose.model("Vendor", vendorSchema);

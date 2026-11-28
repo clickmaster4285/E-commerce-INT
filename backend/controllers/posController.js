@@ -6,8 +6,7 @@ const Variant = require("../models/Variant");
 const PosSale = require("../models/PosSale");
 const Customer = require("../models/Customer");
 const StockHistory = require("../models/StockHistory");
-
-const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const { escapeRegex } = require("../utils/escapeRegex");
 
 const supportedLocales = new Set(["en", "ur", "ar", "es", "fr", "de", "hi", "zh", "pt", "tr"]);
 const getLocale = (value) => supportedLocales.has(String(value || "").toLowerCase()) ? String(value).toLowerCase() : "en";
@@ -40,122 +39,174 @@ const getPosProducts = async (req, res) => {
     const sort = String(req.query.sort || "recent").trim();
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
+    const SEARCH_CAP = 20;
 
-    // Facet lists from active catalog (names only) — still needed for POS filters UI
-    const facetProducts = await Product.find({ is_deleted: { $ne: true }, status: "active" })
-      .select("category_id brand_id")
-      .populate("category_id", "name")
-      .populate("brand_id", "name")
-      .lean();
-    const categories = Array.from(new Set(facetProducts.map((p) => p?.category_id?.name).filter(Boolean)))
-      .sort((a, b) => a.localeCompare(b));
-    const brands = Array.from(new Set(facetProducts.map((p) => p?.brand_id?.name).filter(Boolean)))
-      .sort((a, b) => a.localeCompare(b));
+    const Category = require("../models/Category");
+    const Brand = require("../models/Brand");
 
-    // Narrow products in Mongo first (§9.3) — avoid loading every variant into Node
-    const productQuery = { is_deleted: { $ne: true }, status: "active" };
-    if (search) {
-      const rx = new RegExp(escapeRegex(search), "i");
-      productQuery.name = rx;
-    }
-    let products = await Product.find(productQuery)
-      .select("name translations status tax category_id brand_id")
-      .populate("category_id", "name")
-      .populate("brand_id", "name")
-      .sort({ created_at: -1 })
-      .lean();
+    const [categoryNames, brandNames] = await Promise.all([
+      Category.find({ is_deleted: { $ne: true }, is_active: { $ne: false } }).select("name").sort({ name: 1 }).limit(200).lean(),
+      Brand.find({ is_deleted: false, is_active: { $ne: false } }).select("name").sort({ name: 1 }).limit(200).lean(),
+    ]);
+    const categories = categoryNames.map((c) => c.name).filter(Boolean);
+    const brands = brandNames.map((b) => b.name).filter(Boolean);
+
+    const activeProduct = { is_deleted: { $ne: true }, status: "active" };
+    const productMatch = { ...activeProduct };
     if (category) {
-      products = products.filter((p) => String(p?.category_id?.name || "").toLowerCase() === category.toLowerCase());
+      const catDoc = await Category.findOne({
+        name: new RegExp(`^${escapeRegex(category)}$`, "i"),
+        is_deleted: { $ne: true },
+      }).select("_id").lean();
+      if (!catDoc) {
+        return res.status(200).json({
+          success: true,
+          data: [],
+          pagination: { total: 0, page: 1, limit, totalPages: 1 },
+          filters: { categories, brands },
+        });
+      }
+      productMatch.category_id = catDoc._id;
     }
     if (brand) {
-      products = products.filter((p) => String(p?.brand_id?.name || "").toLowerCase() === brand.toLowerCase());
-    }
-
-    // Also match variants by sku/title when searching (union with name matches)
-    let productIds = products.map((p) => p._id);
-    if (search) {
-      const rx = new RegExp(escapeRegex(search), "i");
-      const skuHits = await Variant.find({
-        is_deleted: { $ne: true },
-        status: "active",
-        $or: [{ sku: rx }, { title: rx }],
-      }).select("product_id").lean();
-      const extraIds = skuHits.map((v) => v.product_id).filter(Boolean);
-      if (extraIds.length) {
-        const missing = extraIds.filter((id) => !productIds.some((pid) => String(pid) === String(id)));
-        if (missing.length) {
-          const extraProducts = await Product.find({
-            _id: { $in: missing },
-            is_deleted: { $ne: true },
-            status: "active",
-          })
-            .select("name translations status tax category_id brand_id")
-            .populate("category_id", "name")
-            .populate("brand_id", "name")
-            .lean();
-          products = products.concat(extraProducts);
-          productIds = products.map((p) => p._id);
-        }
+      const brandDoc = await Brand.findOne({
+        name: new RegExp(`^${escapeRegex(brand)}$`, "i"),
+        is_deleted: false,
+      }).select("_id").lean();
+      if (!brandDoc) {
+        return res.status(200).json({
+          success: true,
+          data: [],
+          pagination: { total: 0, page: 1, limit, totalPages: 1 },
+          filters: { categories, brands },
+        });
       }
+      productMatch.brand_id = brandDoc._id;
     }
 
-    if (!productIds.length) {
-      return res.status(200).json({
-        success: true,
-        data: [],
-        pagination: { total: 0, page: 1, limit, totalPages: 1 },
-        filters: { categories, brands },
-      });
-    }
-
-    const productById = new Map(products.map((product) => [String(product._id), product]));
-    const variantFilter = {
-      status: "active",
-      is_deleted: { $ne: true },
-      product_id: { $in: productIds },
-    };
-    if (stock === "in_stock") variantFilter.quantity = { $gt: 0 };
-    else if (stock === "out_of_stock") variantFilter.quantity = { $lte: 0 };
-
-    let variants = await Variant.find(variantFilter)
-      .select("_id product_id sku title selling_price quantity status attributes images min_qnt translations created_at")
-      .sort({ created_at: -1 })
-      .lean();
-
-    if (stock === "low_stock") {
-      variants = variants.filter((v) => {
-        const qty = Number(v.quantity) || 0;
-        return qty > 0 && qty <= (Number(v.min_qnt) || 0);
-      });
-    }
+    let constrainedProductIds = null;
     if (search) {
-      const searchText = search.toLowerCase();
-      const searchRegex = new RegExp(escapeRegex(search), "i");
-      variants = variants.filter((variant) => {
-        const product = productById.get(String(variant.product_id));
-        if (!product) return false;
-        const productMatches = `${product.name || ""} ${product?.category_id?.name || ""} ${product?.brand_id?.name || ""}`
-          .toLowerCase()
-          .includes(searchText);
-        return productMatches || searchRegex.test(`${variant.sku || ""} ${variant.title || ""}`);
-      });
+      const escaped = escapeRegex(search);
+      const prefix = new RegExp(`^${escaped}`, "i");
+      const rx = new RegExp(escaped, "i");
+      const [prodHits, varHits] = await Promise.all([
+        Product.find({
+          ...productMatch,
+          $or: [
+            { search_text: prefix },
+            {
+              $and: [
+                { $or: [{ search_text: "" }, { search_text: { $exists: false } }, { search_text: null }] },
+                { name: rx },
+              ],
+            },
+          ],
+        }).select("_id").limit(SEARCH_CAP).lean(),
+        Variant.find({
+          status: "active",
+          is_deleted: { $ne: true },
+          $or: [{ sku: rx }, { title: rx }],
+        }).select("product_id").limit(SEARCH_CAP).lean(),
+      ]);
+      const idSet = new Set();
+      for (const p of prodHits) idSet.add(String(p._id));
+      for (const v of varHits) if (v.product_id) idSet.add(String(v.product_id));
+      if (!idSet.size) {
+        return res.status(200).json({
+          success: true,
+          data: [],
+          pagination: { total: 0, page: 1, limit, totalPages: 1 },
+          filters: { categories, brands },
+        });
+      }
+      constrainedProductIds = [...idSet].map((id) => new mongoose.Types.ObjectId(id));
     }
 
-    if (sort === "name") {
-      variants.sort((a, b) => {
-        const productNameOrder = (productById.get(String(a.product_id))?.name || "")
-          .localeCompare(productById.get(String(b.product_id))?.name || "");
-        return productNameOrder || String(a.title || "").localeCompare(String(b.title || ""));
-      });
-    } else if (sort === "price_asc" || sort === "price_desc") {
-      const direction = sort === "price_asc" ? 1 : -1;
-      variants.sort((a, b) => ((Number(a.selling_price) || 0) - (Number(b.selling_price) || 0)) * direction);
+    const variantMatch = { status: "active", is_deleted: { $ne: true } };
+    if (stock === "in_stock") variantMatch.quantity = { $gt: 0 };
+    else if (stock === "out_of_stock") variantMatch.quantity = { $lte: 0 };
+    else if (stock === "low_stock") {
+      variantMatch.$expr = {
+        $and: [
+          { $gt: ["$quantity", 0] },
+          { $lte: ["$quantity", { $ifNull: ["$min_qnt", 0] }] },
+        ],
+      };
     }
 
-    const total = variants.length;
+    const pipeline = [
+      { $match: variantMatch },
+      {
+        $lookup: {
+          from: Product.collection.name,
+          localField: "product_id",
+          foreignField: "_id",
+          as: "p",
+        },
+      },
+      { $unwind: "$p" },
+      {
+        $match: {
+          "p.is_deleted": { $ne: true },
+          "p.status": "active",
+          ...(productMatch.category_id ? { "p.category_id": productMatch.category_id } : {}),
+          ...(productMatch.brand_id ? { "p.brand_id": productMatch.brand_id } : {}),
+          ...(constrainedProductIds ? { product_id: { $in: constrainedProductIds } } : {}),
+        },
+      },
+    ];
+
+    const sortStage =
+      sort === "price_asc" || sort === "price_desc"
+        ? { selling_price: sort === "price_asc" ? 1 : -1, _id: 1 }
+        : sort === "name"
+          ? { "p.name": 1, title: 1, _id: 1 }
+          : { created_at: -1, _id: -1 };
+
+    const skip = (page - 1) * limit;
+    const [facet] = await Variant.aggregate([
+      ...pipeline,
+      {
+        $facet: {
+          total: [{ $count: "n" }],
+          rows: [
+            { $sort: sortStage },
+            { $skip: skip },
+            { $limit: limit },
+            {
+              $project: {
+                _id: 1,
+                product_id: 1,
+                sku: 1,
+                title: 1,
+                selling_price: 1,
+                quantity: 1,
+                status: 1,
+                attributes: 1,
+                images: 1,
+                min_qnt: 1,
+                translations: 1,
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    const total = facet?.total?.[0]?.n || 0;
     const totalPages = Math.max(1, Math.ceil(total / limit));
     const safePage = Math.min(page, totalPages);
-    const pageVariants = variants.slice((safePage - 1) * limit, safePage * limit);
+    const pageVariants = facet?.rows || [];
+    const pageProductIds = [...new Set(pageVariants.map((v) => String(v.product_id)))];
+    const products = pageProductIds.length
+      ? await Product.find({ _id: { $in: pageProductIds } })
+        .select("name translations status tax category_id brand_id")
+        .populate("category_id", "name")
+        .populate("brand_id", "name")
+        .lean()
+      : [];
+    const productById = new Map(products.map((product) => [String(product._id), product]));
+
     const productsByPage = new Map();
     for (const variant of pageVariants) {
       const product = productById.get(String(variant.product_id));

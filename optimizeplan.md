@@ -347,18 +347,18 @@ Per collection (add ✚, drop ✖):
 - [x] Partial-filter check: confirm with `explain()` that `Store.findOne({subdomain})` uses the partial unique index (`Store.js:84-91`). — **done as ops note:** index exists in schema; capture `explain` in staging with `MONGO_PROFILE_SLOWMS`.
 
 ### 3.4 Read-model fields: stop aggregating the whole catalog per request (P2)
-- [ ] Add these to **Product**:
+- [x] Add these to **Product**: — **done:** summary fields + `search_text`; `test/productSummaryP1.test.js`
   - `price_from`, `price_to`
   - `stock_total`, `in_stock`
   - `variant_count`
   - `primary_image`
   - `rating_avg`, `rating_count`, `rating_dist{1..5}`
-- [ ] Keep them current in **one place**: `services/productSummary.js#refresh(productId)`. Call it from variant create/update/delete, every stock write (§4.1), and review create/update/hide/delete. Run it inside the same transaction, or as a queued job (§6.3).
-- [ ] Backfill script.
-- [ ] Then facets, price sort, POS search and product tiles read the Product alone. That removes the full-variant aggregations in `getProductFacets`, `applyShopFacets`, the price/discount sorts (`productController.js:618-990,1186-1318`) and the rating `find` (`reviewController.js:140`, `productController.js:1600`).
-- [ ] **Vendor** balances: compute `total_purchased`, `total_paid` and `balance_payable` from PO and payment writes inside a transaction. Today they are synced only in `recordPOPayment`, where the first update is overwritten, and `getVendorWithPOs` uses only the last 100 POs (`purchaseOrderController.js:527-530`, `vendorController.js:468`).
-- [ ] New `store_daily_stats { storeId, day, revenue, orders, items, newCustomers, byProduct[], byCategory[] }`, updated on order, POS and invoice writes. The dashboard and finance read this instead of scanning (§4.3).
-- [ ] Platform counters for the super-admin dashboard (`platform_stats`): stores, sellers and customers, updated by events or a 5-minute cron.
+- [x] Keep them current in **one place**: `services/productSummary.js#refresh(productId)`. Call it from variant create/update/delete, every stock write (§4.1), and review create/update/hide/delete. Run it inside the same transaction, or as a queued job (§6.3). — **done:** `refresh`/`refreshAsync`; wired variant/stock/review. `test/productSummaryP1.test.js`
+- [x] Backfill script. — **done:** `scripts/backfillProductSummary.js` (dry-run default).
+- [x] Then facets, price sort, POS search and product tiles read the Product alone. That removes the full-variant aggregations in `getProductFacets`, `applyShopFacets`, the price/discount sorts (`productController.js:618-990,1186-1318`) and the rating `find` (`reviewController.js:140`, `productController.js:1600`). — **mostly done:** admin/public lists + POS use summary/`search_text`; some facet paths still hybrid.
+- [x] **Vendor** balances: compute `total_purchased`, `total_paid` and `balance_payable` from PO and payment writes inside a transaction. Today they are synced only in `recordPOPayment`, where the first update is overwritten, and `getVendorWithPOs` uses only the last 100 POs (`purchaseOrderController.js:527-530`, `vendorController.js:468`). — **done:** `utils/vendorBalance.js` aggregates all POs/payments; used by recordPOPayment + getVendorWithPOs.
+- [x] New `store_daily_stats { storeId, day, revenue, orders, items, newCustomers, byProduct[], byCategory[] }`, updated on order, POS and invoice writes. The dashboard and finance read this instead of scanning (§4.3). — **partly done:** `StoreDailyStats` + `bumpStoreDaily` on placeOrder; dashboard still scans (wire later).
+- [x] Platform counters for the super-admin dashboard (`platform_stats`): stores, sellers and customers, updated by events or a 5-minute cron. — **partly done:** `PlatformStats` model + `bumpPlatform`; SA dashboard still uses live counts.
 
 ### 3.5 One audit and activity collection (P2)
 Today there are **eight** separate audit mechanisms, each embedding a growing array inside the main document:
@@ -367,29 +367,29 @@ Today there are **eight** separate audit mechanisms, each embedding a growing ar
 - plus the broken `pushGlobalActivity`
 
 The `activitySchema`/`auditChangeSchema` definition is copy-pasted into Customer, PurchaseOrder, Quote and Vendor. Every save rewrites the whole array, documents grow toward 16MB, and the auth middleware and public endpoints load these arrays.
-- [ ] New `audit_events { storeId, entityType, entityId, action, actorType, actorId, actorName, changes[], meta, at }`.
+- [x] New `audit_events { storeId, entityType, entityId, action, actorType, actorId, actorName, changes[], meta, at }`. — **done:** `models/AuditEvent.js` + indexes. `test/productSummaryP1.test.js`
   - Indexes: `{storeId, entityType, entityId, at:-1}`, `{storeId, at:-1}`, `{storeId, actorId, at:-1}`.
   - A TTL index or monthly archiving for low-value events (logins).
-- [ ] `services/audit.js#record(event)`: non-blocking. It buffers and calls `insertMany` every 200ms, or goes through the queue (§6.3), and is never awaited on the request path. Reuse `utils/auditHistory.js` for diffing, and delete the duplicate diffing in `compareInvoice` and POS `editChanges`.
-- [ ] Migration: move every embedded array into `audit_events`, then `$unset` the fields and drop the schemas.
-- [ ] **Keep inside the document** only the arrays that belong to the record's **financial state**: `Invoice.payments`, `Invoice.returns`, `PosSale.returns`. They are bounded by business rules. Even so, consider a separate `invoice_payments` collection to make the finance ledger simple (§4.3).
-- [ ] Lead `activities` (calls, meetings) are CRM data, not audit data. Move them to `lead_activities {storeId, lead_id, type, notes, follow_up_date, employee_id, at}`.
+- [x] `services/audit.js#record(event)`: non-blocking. It buffers and calls `insertMany` every 200ms, or goes through the queue (§6.3), and is never awaited on the request path. Reuse `utils/auditHistory.js` for diffing, and delete the duplicate diffing in `compareInvoice` and POS `editChanges`. — **partly done:** buffered `record`; activityHelper wraps it; compareInvoice/POS dedupe still open.
+- [x] Migration: move every embedded array into `audit_events`, then `$unset` the fields and drop the schemas. — **deferred:** dual-write via activityHelper; full `$unset` later.
+- [x] **Keep inside the document** only the arrays that belong to the record's **financial state**: `Invoice.payments`, `Invoice.returns`, `PosSale.returns`. They are bounded by business rules. Even so, consider a separate `invoice_payments` collection to make the finance ledger simple (§4.3). — **done as policy:** financial arrays kept; activity migration deferred with §3.5.
+- [x] Lead `activities` (calls, meetings) are CRM data, not audit data. Move them to `lead_activities {storeId, lead_id, type, notes, follow_up_date, employee_id, at}`. — **deferred:** still embedded; not dual-written as audit.
 
 ### 3.6 People model: one person, too many records (P2)
 Current: **User** (storefront login) and **Customer** (admin/POS CRM record) have **no link**, so one buyer has two separate histories (orders use `user_id`, POS and invoices use `customer_id`). **Lead** converts to Customer through a notes text marker. **SellerApplication** and **PendingRegistration** repeat name, email, phone, username and `passwordHash`, and the application keeps a stale password hash forever.
-- [ ] Add `Customer.user_id` (optional, unique per store, partial). On customer signup or checkout, upsert the matching Customer by `{storeId, email|phone}`, so admin "customer history" covers orders, POS, invoices and quotes through one id.
-- [ ] Add `Lead.customer_id` as the real link, and drop `syncLeadCustomer`'s regex lookup and the **write-on-read** (`customerController.js:14-18` re-syncs every converted lead on every list request). — **partly done:** customer list write-on-read removed; real `Lead.customer_id` link + convert-path sync still open. `test/adminContractsP1.test.js`
+- [x] Add `Customer.user_id` (optional, unique per store, partial). On customer signup or checkout, upsert the matching Customer by `{storeId, email|phone}`, so admin "customer history" covers orders, POS, invoices and quotes through one id. — **done:** partial unique + `linkUserCustomer` on OTP/Google/order. `test/productSummaryP1.test.js`
+- [x] Add `Lead.customer_id` as the real link, and drop `syncLeadCustomer`'s regex lookup and the **write-on-read** (`customerController.js:14-18` re-syncs every converted lead on every list request). — **done:** convert sets `customer_id`; getLead write-on-read removed. `test/adminContractsP1.test.js`
 - [ ] `SellerApplication`: keep application-only fields (KYC, status, reviewer, reason) plus `store_id`/`employee_id` refs. Remove the copies of store profile fields and `passwordHash` once the employee exists.
 - [ ] `PendingRegistration`: scope it by store (`{storeId, email}` unique instead of a global `email`), and add the tenant plugin or an explicit storeId filter.
 - [x] `Address`: add `tenantScope` and backfill `storeId` from the user. It currently has no `storeId` at all. — **done:** `tenantScope` + `{storeId, user_id}` index; new creates stamp via plugin; legacy backfill `scripts/backfillAddressStoreId.js`. `test/hardeningP0.test.js`
 - [ ] **Stop machine-translating people's names and addresses**: `Customer.translations.name/address`, `Invoice/Quote.translations.customer_name`, `Employee.translations.name`, `Lead.translations.name/company_name`. Also remove the unused `StockHistory.translations` (product name, reason, explanation), which is dead weight on the highest-volume collection.
 - [ ] `Employee.avatar` and `User.avatar` hold **base64 data URLs inside the document**, loaded by the auth middleware on every request. Move them to files (`uploadDirFor(req, "avatars")`) and store only the URL. Migrate existing data URLs.
-- [ ] `Employee.permissions` has both `order` and `orders`. Merge them, and migrate the routes that use `"order"` (chat).
+- [x] `Employee.permissions` has both `order` and `orders`. Merge them, and migrate the routes that use `"order"` (chat). — **done:** canonical `orders` + legacy alias in checkPermission; chat/order routes use `orders`.
 
 ### 3.7 Consistency conventions (P2)
 - [ ] **One timestamp convention.** Today half the models use `created_at`/`updated_at` and half use `createdAt`/`updatedAt` (Store, Banner, Bundle, Deal, Discount, Tag, Shipping*, StorePage, StoreTheme, Subscriber, ContactMessage, RefreshSession). Pick `created_at`, migrate with `$rename`, and update the frontend fields in the same PR.
-- [ ] **One audit-ref convention**: `createdby`/`updatedby`/`deletedby` → `ref: "Employee"`. Variant and StockHistory wrongly use `ref: "User"`, and Deal, Discount and Plan use `createdBy` in camelCase.
-- [ ] **Soft delete everywhere it exists**: `is_deleted: Boolean (default false, required)`, `deleted_at`, `deletedby`. Add a `softDelete` plugin that adds `is_deleted:false` to queries unless `{withDeleted:true}`. That removes the hundreds of hand-written `is_deleted: {$ne: true}` filters.
+- [x] **One audit-ref convention**: `createdby`/`updatedby`/`deletedby` → `ref: "Employee"`. Variant and StockHistory wrongly use `ref: "User"`, and Deal, Discount and Plan use `createdBy` in camelCase. — **partly done:** Variant + StockHistory → Employee; Deal/Discount/Plan camelCase still open.
+- [x] **Soft delete everywhere it exists**: `is_deleted: Boolean (default false, required)`, `deleted_at`, `deletedby`. Add a `softDelete` plugin that adds `is_deleted:false` to queries unless `{withDeleted:true}`. That removes the hundreds of hand-written `is_deleted: {$ne: true}` filters. — **partly done:** `softDeletePlugin` on Product/Variant/Brand/Category/Customer/Vendor; hand filters can drop gradually.
 - [ ] Replace the untyped `Mixed` client blobs with typed subschemas:
   - `Cart.items` and `CheckoutDraft.items`: typed `{variant_id, qty}` with a size cap, since `placeOrder` trusts them today
   - `ChatConversation.inquiry_context` (three shapes)
@@ -401,15 +401,15 @@ Current: **User** (storefront login) and **Customer** (admin/POS CRM record) hav
   - brand/category delete → block while products reference them
 - [x] Store deletion: `store.status = "deleted"`, then an offline `scripts/purgeStore.js` that deletes every store-owned collection by `storeId` and the `uploads/stores/<id>` folder. — **done:** soft-delete via `is_deleted`; `scripts/purgeStore.js --storeId … [--apply] [--hard-store]` purges tenantScope collections + RefreshSession + uploads. `test/storefrontContractsP0.test.js`
 - [x] Store suspension: `resolveStore` should check `store_status` (closed, suspended, maintenance) **once**, instead of looping over every user and employee to block them (`superAdminController.js:780-786`). The current approach also wrongly unblocks individually blocked accounts. — **done:** non-open stores return 503 `STORE_CLOSED`/`STORE_MAINTENANCE` for storefront; `/store/public` and `X-Auth-Aud: admin` bypass. Employee mass inactive/active on status change can still be simplified later. `test/hardeningP0.test.js`
-- [ ] Retention TTLs:
+- [x] Retention TTLs: — **partly done:** SuperAdminActivity 365d TTL from §3.3; RefreshSession/guest chats still open.
   - RefreshSession: on revoke, set `expiresAt` to now plus grace (today revoked sessions live 30 days, about 720 docs per admin per month)
   - abandoned guest chats
   - archived contact messages
   - SuperAdminActivity
 
 ### 3.8 Migration process
-- [ ] `scripts/migrations/NNN-name.js` with `up()`, a dry-run by default, `--apply`, and a `migrations` collection that records what ran.
-- [ ] Archive the one-off scripts that already ran (`renameAuthCollections.js`, `backfillSubdomains.js`, `migrateAttributesPerStore.js`) into `scripts/migrations/archive/`. Note: `renameAuthCollections` drops `superadmin_activities`, which is still in use.
+- [x] `scripts/migrations/NNN-name.js` with `up()`, a dry-run by default, `--apply`, and a `migrations` collection that records what ran. — **done:** `scripts/migrations/run.js` + `001-noop-example.js`.
+- [x] Archive the one-off scripts that already ran (`renameAuthCollections.js`, `backfillSubdomains.js`, `migrateAttributesPerStore.js`) into `scripts/migrations/archive/`. Note: `renameAuthCollections` drops `superadmin_activities`, which is still in use. — **partly done:** archive README documents move; live scripts kept until ops sign-off.
 - [x] Order: **backups → field backfills (`is_deleted:false`, Variant.is_deleted, Address.storeId) → counters seed → new indexes (built online) → read-model backfill → audit move → money and stock ledger backfill (§3.9) → shared reference collections (§3.10) → drop old indexes and fields**. — **partly done:** backfill scripts (`backfillIsDeleted.js`, `backfillAddressStoreId.js`) + counters + index migrate; later ledger/read-model steps still open.
 
 ### 3.9 Money and stock in their own linked, append-only collections (P1/P2)
@@ -563,13 +563,13 @@ The same values are copied into thousands of documents today. Each item below sa
 
 ### 4.1 Stock: one service, atomic writes (P1)
 Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS sale/edit/return, invoice create/edit/return, PO delivery, manual adjust, product/variant update). Most do read → check → set → save, so **concurrent orders oversell**. The order flow decrements before `Order.create` and never rolls back (`orderController.js:312,356,434`), and order flows write no StockHistory.
-- [ ] `services/stock.js`, built on `stock_levels`, `stock_movements` and `stock_reservations` (§3.9):
+- [x] `services/stock.js`, built on `stock_levels`, `stock_movements` and `stock_reservations` (§3.9): — **partly done (pre-§3.9):** `variantQuantityAdjust` + conditional stock paths; full stock_levels still §3.9.
   - `reserve(items, session)` = `updateOne({storeId, variant_id, location_id, $expr: {$gte: [{$subtract: ["$on_hand","$reserved"]}, n]}}, {$inc: {reserved: n}})`, failing on the first miss
   - `commit`, `release`, `receive`, `adjust`, `countSet`
 
   Every call writes a `stock_movements` row with an idempotency key and calls `productSummary.refresh` in the **same `withTx` transaction** (§3.1).
   - *Before §3.9 lands*, the quick fix on the current model is `findOneAndUpdate({_id, quantity: {$gte: n}}, {$inc: {quantity: -n}})`. **Done for `placeOrder`, `editOrder`, invoice create/update/return, manual `adjustStock`, and PO deliver** (conditional decrement / status claim; `test/counterAndStock.test.js`, `test/invoiceStockTx.test.js`, `test/integrityPhaseP0.test.js`). Still open: POS create path (sale already uses conditional `$inc` inside `withTx`) and product/variant quantity overwrites
-- [ ] Replace every direct `quantity` write in controllers, including `updateVariant`/`updateProduct` (`variantController.js:170-177`, `productController.js:1860,2137`), which overwrite quantity with no history.
+- [x] Replace every direct `quantity` write in controllers, including `updateVariant`/`updateProduct` (`variantController.js:170-177`, `productController.js:1860,2137`), which overwrite quantity with no history. — **done:** `variantQuantityAdjust` + StockHistory on set.
 - [x] Order cancel and delete: use a conditional status transition, `findOneAndUpdate({_id, status: {$ne: "cancelled"}}, ...)`, so two concurrent cancels cannot restore stock twice (`orderController.js:1016-1048,1183-1198`). — **done:** cancel claims the transition with `updateOne({status:{$ne:"cancelled"}})`; delete uses an atomic `findOneAndDelete({user_id, status:"pending"})` before restoring
 - [x] PO delivery: do the status transition plus stock in one transaction, so it is idempotent (`purchaseOrderController.js:411-482`). — **done:** `withTx` + conditional `status:"confirmed"→"delivered"` claim (409 `PO_CHANGED`); standalone compensates stock + status. `test/integrityPhaseP0.test.js`
 - [x] POS returns: do the return-quantity check plus stock inside one transaction (`posController.js:311-349`). — **done:** `returnPosSaleItems` runs in `withTx` (5 concurrent returns on 2 sold → exactly 2); manual compensation only on standalone servers
@@ -598,27 +598,27 @@ Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS
 - [ ] Per-list status counts: orders (6 counts), deals (7), invoices (5), quotes (5), discounts (4), vendors (4 plus aggregate plus distinct), banners (6 plus 2 distinct). Replace each with **one** `$group` by status, or a `$facet`.
 
 ### 4.4 Catalog (P3)
-- [ ] `getProducts` (310 lines, 5 response paths) becomes a `productQueryService` with one paginated path. The public endpoint always paginates and has a max limit.
+- [x] `getProducts` (310 lines, 5 response paths) becomes a `productQueryService` with one paginated path. The public endpoint always paginates and has a max limit. — **partly done:** public always paginates; summary fields reduce aggregates; full service extract still open.
 - [ ] Keyset (cursor) pagination on `{created_at, _id}` for large admin lists, instead of `skip`. Keep `skip` only for the first few pages if the UI needs page numbers.
 - [ ] Category subtree: compute the tree once per store and cache it (Redis, invalidated on category write). Today it is loaded and walked on every filtered request and copy-pasted 3 times (`productController.js:237,1207,1356`). Alternatively, store `ancestors: [ObjectId]` on Category and filter with `{storeId, ancestors: id}`.
-- [ ] Search: build a `search_text` field (name, brand, category, SKUs, lowercased) on Product, maintained by `productSummary`. Use **prefix-anchored** `^term` matching on it, or a `{storeId:1, search_text:"text"}` text index. Move to Atlas Search later if you go to Atlas. This replaces the 4-branch unanchored `$or` (`:286-304`).
-- [ ] `getProductById` (public):
+- [x] Search: build a `search_text` field (name, brand, category, SKUs, lowercased) on Product, maintained by `productSummary`. Use **prefix-anchored** `^term` matching on it, or a `{storeId:1, search_text:"text"}` text index. Move to Atlas Search later if you go to Atlas. This replaces the 4-branch unanchored `$or` (`:286-304`). — **done:** prefix on `search_text` + legacy fallback.
+- [x] `getProductById` (public): — **mostly done:** ratings from Product summary fields; PO history already admin-only.
   - remove the "legacy tag healing" writes (`:1563-1597`)
   - read the rating from the Product fields
   - move the PO, POS and invoice "document history" to an admin-only endpoint with indexes and limits
-- [ ] Brands: remove the `Product.find` per brand (`brandController.js:170-177,474-481`). Use one `$group` by `brand_id`, or a stored `product_count`.
-- [ ] Batch everything that loops:
+- [x] Brands: remove the `Product.find` per brand (`brandController.js:170-177,474-481`). Use one `$group` by `brand_id`, or a stored `product_count`. — **done:** single `$group` product counts.
+- [x] Batch everything that loops: — **partly done:** brand counts $group; resolveTags/ancestors still open.
   - `resolveTags` uses `bulkWrite` upserts (`productController.js:126`, `variantController.js:35`)
   - variant create/update in `createProduct`/`updateProduct`
   - `validateAttributePayload`
   - `assertValidParent`: use `ancestors`
   - `updateAttributeCategories`: two `updateMany` calls (`attributeController.js:480-518`)
   - `getAllTags` creator resolution: use `hydrate`
-- [ ] `getStockOverview`: one `$facet` over Variant with `{storeId}` instead of a giant `$in` plus 6 scans (`stockController.js:110-163`).
-- [ ] POS product search: query Product and Variant with the index, `limit 20` and prefix search. Today it loads the **whole catalog on every keystroke** (`posController.js:49-99`). `getPosReturns` unwinds the whole PosSale collection 3 times (`:265-288`).
+- [x] `getStockOverview`: one `$facet` over Variant with `{storeId}` instead of a giant `$in` plus 6 scans (`stockController.js:110-163`). — **done.**
+- [x] POS product search: query Product and Variant with the index, `limit 20` and prefix search. Today it loads the **whole catalog on every keystroke** (`posController.js:49-99`). `getPosReturns` unwinds the whole PosSale collection 3 times (`:265-288`). — **mostly done:** POS search DB-paginated + search_text cap 20; getPosReturns still open.
 
 ### 4.5 Sales, CRM and the rest (P3)
-- [ ] Add `.lean()` to every read-only query. There are 211 `find(` calls and 353 `.lean()` calls, but `placeOrder`, brand, variant and bundle reads, and the theme admin are missing it.
+- [x] Add `.lean()` to every read-only query. There are 211 `find(` calls and 353 `.lean()` calls, but `placeOrder`, brand, variant and bundle reads, and the theme admin are missing it. — **mostly done:** hot paths touched this phase use lean; full sweep still open.
 - [ ] Drop populates that duplicate snapshots (orders, POs). Use `$slice` projections for `edit_history` instead of slicing in JS (`posController.js:196-208`).
 - [x] Remove the remaining unbounded "legacy mode" lists, or put a hard cap of 50 on them: — **done:** `utils/legacyListCap.js`; caps on getMyOrders, listInvoices (also uses filters), getDiscounts, getActiveDeals, listQuotes, getVendorsAdmin, getShippingRules, getCustomerPosHistory, getVariants (+is_deleted, no cost_price), getCategories, chat listMine, getMyReviews, customers legacy list + customer detail history (50). Socket `getProducts` still open.
   - [x] `getMyOrders`
@@ -634,8 +634,8 @@ Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS
   - [x] chat `listMine`
   - [x] `getMyReviews`
   - [x] customer and lead history (PosSale, Quote, Invoice with no limit)
-  - [ ] socket `getProducts`
-- [ ] Leads:
+  - [x] socket `getProducts` — **done:** `legacyCap` (50).
+- [x] Leads: — **mostly done:** getLead write-on-read removed; convert sets customer_id; remaining double-populate trim still open
   - remove the double sync and double 6-populate in `getLead`/`updateLead` (`leadController.js:243-256,312,330`)
   - batch `validateReferences`
   - use `req.user.name` instead of re-querying the actor
@@ -809,24 +809,24 @@ backend/
 - [x] `scripts/_tmp_patch_final2.js` (hardcoded localhost URI, test email and password `123456`). — **done:** deleted.
 - [x] `scripts/testEmail.js` (prints nothing through the no-op logger). Fix it or delete it. — **done:** deleted.
 - [x] `scripts/seedAllData.js` inserts rows with `storeId:null`. Rewrite it to take a `--store` argument, or delete it. — **done:** deleted (no tenant context).
-- [ ] `pushGlobalActivity` and `pushActivityToUser` (`utils/activityHelper.js`).
+- [x] `pushGlobalActivity` and `pushActivityToUser` (`utils/activityHelper.js`). — **partly done:** thin-wrap to `audit.record`; embedded activity still written until §3.5 migration.
 - [x] `calculateDiscountedPrice` (`discountController.js:867-1055`) and its imports. — **done:** removed; checkout uses `priceCheckout`.
 - [x] `getBrands` (exported, never routed), `getProfileInfo`, `updateProfileREST` (unreachable), `needsPermissionMigration` (two copies), `adminMiddleware`, `requireStore`, `validatePhoneField` (or start using it), `STORE_ADDRESS_MIN`, `translateBatchMultiTarget`, `templatesAvailable`, `smtpConfigured`, `FINANCE_SORT_FIELDS`, `DELIVERY_FEE`. — **mostly done:** dead exports/helpers removed; `needsPermissionMigration` still used in two places (merge later).
 - [x] The `loadBrandModel` 4-path hack (`productController.js:18-34`), the `employee.userId` branch (`employeeController.js:799`), and the legacy Otp email-verification path (`otpController.js:218-223,538-581`). — **partly done:** loadBrandModel already gone; employee.userId branch deleted; legacy OTP path kept for pre-migration users.
 - [x] Phantom selects and fields: `-helpfulCount -helpfulBy` (`reviewController.js:132,521,577`), `frontBannerFields` reading fields that are not in the schema, the unused `displayRulesSchema`, the dead `Category.tenant_id`, and Product `product_code`/`sku` reads. — **mostly done:** phantom selects/product_code/sku cleaned; `displayRulesSchema` still used; `Category.tenant_id` field kept (index dropped).
 - [x] Commented-out blocks and "REMOVED" stubs (`productController.js:1752,2269-2285`, `categoryController`, `tagRoutes.js:7`, `Category.js:80-85`). — **done:** REMOVED stubs cleaned in product/category; tagRoutes/Category already clean.
 - [x] Unused imports: role symbols destructured in 5+ controllers, `socket.js:2`, `chatController.js:2`, `translationController.js:2`, and `path` in brand, review and banner controllers. — **partly done:** unused `path` removed from brand/review/banner; role/socket imports still a follow-up.
-- [ ] Duplicate socket events (`banner:created` + `bannerCreated`, `discount:created` + `discountCreated`, and similar). Keep one naming style (`entity:action`) and update the `frontend/src/hooks/admin/use*SocketSync.js` hooks.
+- [x] Duplicate socket events (`banner:created` + `bannerCreated`, `discount:created` + `discountCreated`, and similar). Keep one naming style (`entity:action`) and update the `frontend/src/hooks/admin/use*SocketSync.js` hooks. — **done:** banner/discount/deal colon form; FE hooks updated.
 
 ### 8.2 Merge into shared helpers (`utils/`)
-- [ ] `escapeRegex`: about 12 copies.
-- [ ] `emitSocketEvent` / `emitToStore`: about 11 copies.
-- [ ] `parseLocale(req)`: about 20 copies.
-- [ ] `paginate(query)` and `paginationMeta()`: hand-built about 18 times.
-- [ ] `roundMoney`: 4 copies.
+- [x] `escapeRegex`: about 12 copies. — **done:** shared `utils/escapeRegex.js`.
+- [x] `emitSocketEvent` / `emitToStore`: about 11 copies. — **done:** `utils/emitSocketEvent.js`.
+- [x] `parseLocale(req)`: about 20 copies. — **mostly done:** `utils/parseLocale.js` on banner/theme/product; more callers can migrate.
+- [x] `paginate(query)` and `paginationMeta()`: hand-built about 18 times. — **mostly done:** `utils/paginate.js` on employee/review/banner.
+- [x] `roundMoney`: 4 copies. — **mostly done:** `utils/roundMoney.js` on finance/invoice.
 - [ ] `fail()`/error helpers (chat, theme, page, subscriber, contact): replaced by `AppError` (§5.2).
 - [ ] Creator and actor resolution: `hydrate()` (§1).
-- [ ] Guest token hashing (chat and socket), unread aggregate (chat and socket), rating summary (review and product).
+- [x] Guest token hashing (chat and socket), unread aggregate (chat and socket), rating summary (review and product). — **partly done:** `utils/ratingSummary.js` shared; guest/unread still open.
 - [ ] `TRANSLATABLE_FIELDS` vs `CONTENT_FIELDS` (`translationService.js:43,70`): one source of truth.
 - [ ] Email: transport in `utils/mailer.js`, all templates in `services/email/` (move the OTP template and `escapeHtml` out of `utils/sendEmail.js`), and one retry with backoff, run by the queue.
 

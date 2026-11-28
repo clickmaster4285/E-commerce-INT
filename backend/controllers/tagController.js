@@ -3,6 +3,7 @@ const User = require("../models/User");
 const Employee = require("../models/Employee");
 const mongoose = require("mongoose");
 const log = require("../utils/logger");
+const { escapeRegex } = require("../utils/escapeRegex");
 
 // Helper to resolve user/employee info
 const resolveCreator = async (userId) => {
@@ -71,7 +72,7 @@ const createTag = async (req, res) => {
     // Check duplicate by name OR slug
     const existing = await Tag.findOne({ 
       $or: [
-        { name: { $regex: `^${require("../utils/escapeRegex").escapeRegex(cleanName)}$`, $options: "i" } },
+        { name: { $regex: `^${escapeRegex(cleanName)}$`, $options: "i" } },
         { slug: slug }
       ], 
       is_deleted: { $ne: true } 
@@ -127,7 +128,7 @@ const updateTag = async (req, res) => {
       : null;
 
     const duplicateQuery = {
-      $or: [{ name: { $regex: `^${require("../utils/escapeRegex").escapeRegex(cleanName)}$`, $options: "i" } }, { slug: slug }],
+      $or: [{ name: { $regex: `^${escapeRegex(cleanName)}$`, $options: "i" } }, { slug: slug }],
       is_deleted: { $ne: true }
     };
     if (excludeId) {

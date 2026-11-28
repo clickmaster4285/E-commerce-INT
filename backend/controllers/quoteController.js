@@ -4,6 +4,7 @@ const { randomUUID } = require("crypto");
 const Quote = require("../models/Quote");
 const QuoteNumberReservation = Quote.NumberReservation;
 const { auditEvent, diffFields, diffItems, valueText } = require("../utils/auditHistory");
+const { escapeRegex } = require("../utils/escapeRegex");
 
 // Atomic counter — reservations bhi isi se number lete hain (pehle 2 collections scan)
 const nextQuoteNumber = async () =>
@@ -107,7 +108,7 @@ exports.listQuotes = async (req, res) => {
     const filter = { is_deleted: false };
     const search = String(req.query.search || "").trim();
     if (search) {
-      const regex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const regex = new RegExp(escapeRegex(search), "i");
       filter.$or = [
         { quote_number: regex },
         { customer_name: regex },

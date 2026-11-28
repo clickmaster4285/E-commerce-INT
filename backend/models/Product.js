@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const tenantScope = require("../utils/tenantScopePlugin");
+const softDeletePlugin = require("../utils/softDeletePlugin");
 
 const productSchema = new mongoose.Schema(
   {
@@ -125,6 +126,28 @@ const productSchema = new mongoose.Schema(
       default: null,
     },
 
+    // ── §3.4 read-model (productSummary.refresh maintain karta hai) ──
+    price_from: { type: Number, default: null },
+    price_to: { type: Number, default: null },
+    stock_total: { type: Number, default: 0, min: 0 },
+    in_stock: { type: Boolean, default: false },
+    variant_count: { type: Number, default: 0, min: 0 },
+    primary_image: { type: String, default: "" },
+    rating_avg: { type: Number, default: 0, min: 0, max: 5 },
+    rating_count: { type: Number, default: 0, min: 0 },
+    rating_dist: {
+      type: {
+        1: { type: Number, default: 0 },
+        2: { type: Number, default: 0 },
+        3: { type: Number, default: 0 },
+        4: { type: Number, default: 0 },
+        5: { type: Number, default: 0 },
+      },
+      default: () => ({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }),
+    },
+    // Lowercased name + brand + category + SKUs — prefix search (§4.4)
+    search_text: { type: String, default: "", index: false },
+
     createdby: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Employee",
@@ -166,11 +189,12 @@ productSchema.index({ storeId: 1, is_featured: 1, is_deleted: 1, featured_at: -1
 productSchema.index({ storeId: 1, category_id: 1, is_deleted: 1 });
 productSchema.index({ storeId: 1, brand_id: 1, is_deleted: 1 });
 productSchema.index({ storeId: 1, tag_ids: 1 });
-// price_from §3.4 read-model field — index abhi se ready
 productSchema.index({ storeId: 1, price_from: 1 });
+productSchema.index({ storeId: 1, search_text: 1 });
 
 
 // ── Multi-tenant ──
 productSchema.plugin(tenantScope); // har store ka data alag (storeId)
+productSchema.plugin(softDeletePlugin);
 
 module.exports = mongoose.model("Product", productSchema);

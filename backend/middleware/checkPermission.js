@@ -10,6 +10,24 @@ const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isA
 // true nahi hota tha aur customer token admin APIs par chal jata tha.
 const CUSTOMER_ALLOWED_KEYS = new Set(["profile"]);
 
+// `order` / `orders` — purane records me dono keys ho sakti hain (§5.4)
+const PERMISSION_ALIASES = {
+  order: "orders",
+  orders: "order",
+};
+
+const resolvePermissionValue = (permissions, permissionKey) => {
+  if (!permissions || typeof permissions !== "object") return undefined;
+  if (Object.prototype.hasOwnProperty.call(permissions, permissionKey)) {
+    return permissions[permissionKey];
+  }
+  const alias = PERMISSION_ALIASES[permissionKey];
+  if (alias && Object.prototype.hasOwnProperty.call(permissions, alias)) {
+    return permissions[alias];
+  }
+  return undefined;
+};
+
 // ✅ Specific permission check
 const checkPermission = (permissionKey) => {
   return (req, res, next) => {
@@ -34,7 +52,7 @@ const checkPermission = (permissionKey) => {
     }
 
     // undefined = allow (legacy), only explicitly false blocks
-    if (req.user.permissions?.[permissionKey] === false) {
+    if (resolvePermissionValue(req.user.permissions, permissionKey) === false) {
       return res.status(403).json({
         success: false,
         message: `Access denied. You don't have '${permissionKey}' permission. Please contact an administrator.`,
@@ -66,4 +84,5 @@ module.exports = {
   checkPermission,
   staffPermissionCheck,
   requirePermission: checkPermission, // Backward compatibility
+  resolvePermissionValue,
 };

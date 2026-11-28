@@ -2,6 +2,8 @@ const Brand = require("../models/Brand");
 const Product = require("../models/Product");
 const fs = require("fs-extra");
 const { getIO } = require("../utils/socket");
+const { emitSocketEvent } = require("../utils/emitSocketEvent");
+const { escapeRegex } = require("../utils/escapeRegex");
 const log = require("../utils/logger");
 const { withoutProtected } = require("../utils/sanitizeBody"); // mass assignment guard
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
@@ -9,20 +11,8 @@ const { queueTranslationSync } = require("../utils/translationService");
 const { nextSeq, peekSeq, formatNumber, maxNumericSuffix } = require("../utils/counter");
 
 // ==========================================
-// SOCKET HELPER — same pattern as
-// categoryController / productController / dealController.
-// Pehle yahan raw `io.emit(...)` tha jo `req.io` (null ho sakta hai) par
-// unguarded tha. Ye wrapper try/catch + getIO() fallback deta hai, is liye
-// brand mutation kabhi socket failure ki wajah se crash nahi karta.
+// SOCKET — shared emitSocketEvent util (optimizeplan §8.2)
 // ==========================================
-const emitSocketEvent = (event, data) => {
-  try {
-    const io = getIO();
-    if (io) io.emit(event, data);
-  } catch (error) {
-    log.warn(`Socket emit failed for ${event}:`, error.message);
-  }
-};
 
 // ================================
 // GET NEXT BRAND CODE
@@ -116,6 +106,7 @@ const createBrand = async (req, res) => {
       performedBy: performerId,
       performedByName: performerName,
       details: {
+        brandId: updatedBrand._id,
         brandCode: updatedBrand.brand_code,
         brandName: updatedBrand.brand_name || updatedBrand.name,
       },
@@ -410,7 +401,6 @@ const BRAND_SORT_FIELDS = {
 };
 
 // ✅ Search string ko safe regex banane ke liye (special chars se crash na ho)
-const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const getBrandsAdmin = async (req, res) => {
   try {
@@ -426,17 +416,20 @@ const getBrandsAdmin = async (req, res) => {
         .limit(legacyCap(0, 50))
         .lean();
 
-      const brandsWithProducts = await Promise.all(
-        brands.map(async (brand) => {
-          const products = await Product.find({ brand_id: brand._id, is_deleted: { $ne: true } })
-            .populate("category_id", "name")
-            .select("name brand_id category_id status created_at")
-            .limit(20)
-            .lean();
-          return { ...brand, products };
-        })
-      );
-      return res.status(200).json({ success: true, data: brandsWithProducts });
+      const brandIds = brands.map((b) => b._id);
+      const countRows = brandIds.length
+        ? await Product.aggregate([
+          { $match: { brand_id: { $in: brandIds }, is_deleted: { $ne: true } } },
+          { $group: { _id: "$brand_id", productCount: { $sum: 1 } } },
+        ])
+        : [];
+      const countMap = new Map(countRows.map((r) => [String(r._id), Number(r.productCount) || 0]));
+      const brandsWithCounts = brands.map((brand) => ({
+        ...brand,
+        productCount: countMap.get(String(brand._id)) || 0,
+        products: [],
+      }));
+      return res.status(200).json({ success: true, data: brandsWithCounts });
     }
 
     /* ---------- SERVER SIDE PAGINATION ---------- */
@@ -495,6 +488,15 @@ const getBrandsAdmin = async (req, res) => {
     // Return only the currently selected translation to the paginated admin
     // screen. This keeps the page payload language-specific and avoids exposing
     // mixed locale values in its row data.
+    const pageIds = brands.map((b) => b._id);
+    const countRows = pageIds.length
+      ? await Product.aggregate([
+        { $match: { brand_id: { $in: pageIds }, is_deleted: { $ne: true } } },
+        { $group: { _id: "$brand_id", productCount: { $sum: 1 } } },
+      ])
+      : [];
+    const countMap = new Map(countRows.map((r) => [String(r._id), Number(r.productCount) || 0]));
+
     const pageBrands = brands.map((brand) => {
       const nameTranslation = locale === "en" ? "" : brand.translations?.name?.[locale];
       const descriptionTranslation = locale === "en" ? "" : brand.translations?.description?.[locale];
@@ -503,6 +505,7 @@ const getBrandsAdmin = async (req, res) => {
         brand_code: brand.brand_code,
         name: brand.name,
         description: brand.description,
+        productCount: countMap.get(String(brand._id)) || 0,
         ...(locale !== "en" && {
           translations: {
             name: nameTranslation ? { [locale]: nameTranslation } : {},

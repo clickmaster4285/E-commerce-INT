@@ -3,33 +3,15 @@ const log = require("../utils/logger");
 const Product = require("../models/Product");
 const StockHistory = require("../models/StockHistory");
 const { getIO } = require("../utils/socket");
+const { emitSocketEvent } = require("../utils/emitSocketEvent");
 const {
   pushGlobalActivity,
 } = require("../utils/activityHelper");
 const { withTx, TxAbort } = require("../utils/tx");
 
-/* =========================================================
-   SOCKET HELPER
-========================================================= */
 
-const emitSocketEvent = (event, data) => {
-  try {
-    const io = getIO();
-
-    if (io) {
-      io.emit(event, data);
-    }
-  } catch (error) {
-    log.warn(
-      `⚠️ Socket emit failed for ${event}:`,
-      error.message
-    );
-  }
-};
-
-
-const escapeRegExp = (value) =>
-  String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const { escapeRegex } = require("../utils/escapeRegex");
+const { refreshAsync: refreshProductSummary } = require("../services/productSummary");
 
 const getRequestedLocale = (value) => {
   const locale = String(value || "en").trim().toLowerCase();
@@ -107,66 +89,79 @@ const getStockOverview = async (req, res) => {
       ? String(req.query.status || "all")
       : "all";
 
-    // Only non-deleted products are eligible for stock management.
-    const activeProducts = await Product.find({ is_deleted: { $ne: true } }, "_id").lean();
-    const activeProductIds = activeProducts.map((product) => product._id);
-    const inventoryBaseFilter = {
-      is_deleted: { $ne: true },
-      product_id: { $in: activeProductIds },
-    };
-    const baseFilter = { ...inventoryBaseFilter };
-
+    const baseMatch = { is_deleted: { $ne: true } };
     if (search) {
-      const safeSearch = escapeRegExp(search);
+      const safeSearch = escapeRegex(search);
       const matchingProducts = await Product.find(
         {
           is_deleted: { $ne: true },
-          name: { $regex: safeSearch, $options: "i" },
+          $or: [
+            { name: { $regex: safeSearch, $options: "i" } },
+            { search_text: { $regex: `^${safeSearch}`, $options: "i" } },
+          ],
         },
-        "_id"
+        "_id",
       ).lean();
-
-      baseFilter.$or = [
+      baseMatch.$or = [
         { sku: { $regex: safeSearch, $options: "i" } },
         { title: { $regex: safeSearch, $options: "i" } },
         { product_id: { $in: matchingProducts.map((product) => product._id) } },
       ];
     }
 
-    const withStatus = (filter, status) => {
+    const withStatus = (status) => {
       const expression = getStockStatusExpression(status);
-      return expression ? { ...filter, $expr: expression } : filter;
+      return expression ? { $expr: expression } : null;
     };
 
-    const listFilter = withStatus(baseFilter, statusFilter);
-    const countForStatus = (filter, status) =>
-      Variant.countDocuments(withStatus(filter, status));
+    const matchActiveProduct = [
+    { $match: baseMatch },
+    {
+      $lookup: {
+        from: Product.collection.name,
+        localField: "product_id",
+        foreignField: "_id",
+        as: "_prod",
+      },
+    },
+    { $match: { "_prod.0": { $exists: true }, "_prod.0.is_deleted": { $ne: true } } },
+    { $project: { _prod: 0 } },
+  ];
 
-    // Summary cards and status counts stay scoped to the current search, while
-    // the row list below is additionally scoped to the selected status/page.
-    const [
-      searchTotalVariants,
-      searchInStock,
-      searchLowStock,
-      searchOutOfStock,
-      searchProductIds,
-      unitsResult,
-    ] = await Promise.all([
-      Variant.countDocuments(baseFilter),
-      countForStatus(baseFilter, "in"),
-      countForStatus(baseFilter, "low"),
-      countForStatus(baseFilter, "out"),
-      Variant.distinct("product_id", baseFilter),
-      Variant.aggregate([
-        { $match: baseFilter },
-        { $group: { _id: null, total: { $sum: { $ifNull: ["$quantity", 0] } } } },
-      ]),
+    const statusExprIn = getStockStatusExpression("in");
+    const statusExprLow = getStockStatusExpression("low");
+    const statusExprOut = getStockStatusExpression("out");
+
+    const [facetRows] = await Variant.aggregate([
+      ...matchActiveProduct,
+      {
+        $facet: {
+          all: [{ $count: "n" }],
+          in: statusExprIn ? [{ $match: { $expr: statusExprIn } }, { $count: "n" }] : [{ $count: "n" }],
+          low: statusExprLow ? [{ $match: { $expr: statusExprLow } }, { $count: "n" }] : [{ $count: "n" }],
+          out: statusExprOut ? [{ $match: { $expr: statusExprOut } }, { $count: "n" }] : [{ $count: "n" }],
+          products: [{ $group: { _id: "$product_id" } }, { $count: "n" }],
+          units: [{ $group: { _id: null, total: { $sum: { $ifNull: ["$quantity", 0] } } } }],
+        },
+      },
     ]);
+
+    const pickN = (key) => {
+      const row = facetRows?.[key]?.[0];
+      if (!row) return 0;
+      return row.n ?? row.total ?? 0;
+    };
+    const searchTotalVariants = pickN("all");
+    const searchInStock = pickN("in");
+    const searchLowStock = pickN("low");
+    const searchOutOfStock = pickN("out");
+    const searchProductCount = pickN("products");
+    const searchUnits = pickN("units");
 
     const summary = {
       totalVariants: searchTotalVariants,
-      totalProducts: searchProductIds.length,
-      totalUnits: unitsResult[0]?.total || 0,
+      totalProducts: searchProductCount,
+      totalUnits: searchUnits,
       inStock: searchInStock,
       lowStock: searchLowStock,
       outOfStock: searchOutOfStock,
@@ -188,13 +183,28 @@ const getStockOverview = async (req, res) => {
     }];
     const variantSelect = "sku title translations quantity min_qnt max_qnt product_id images";
 
-    // ---- LEGACY MODE (no limit) ----
-    if (!limit) {
-      const variants = await Variant.find(listFilter)
+    const listAggBase = [...matchActiveProduct];
+    const statusExprList = withStatus(statusFilter);
+    if (statusExprList) listAggBase.push({ $match: { $expr: statusExprList } });
+
+  const fetchVariantsByAgg = async (pipeline) => {
+      const idRows = await Variant.aggregate([...pipeline, { $project: { _id: 1 } }]);
+      if (!idRows.length) return [];
+      const order = new Map(idRows.map((r, i) => [String(r._id), i]));
+      const docs = await Variant.find({ _id: { $in: idRows.map((r) => r._id) } })
         .populate(populateProduct)
         .select(variantSelect)
-        .sort({ created_at: -1, _id: -1 })
         .lean();
+      docs.sort((a, b) => order.get(String(a._id)) - order.get(String(b._id)));
+      return docs;
+    };
+
+    // ---- LEGACY MODE (no limit) ----
+    if (!limit) {
+      const variants = await fetchVariantsByAgg([
+        ...listAggBase,
+        { $sort: { created_at: -1, _id: -1 } },
+      ]);
 
       return res.status(200).json({
         success: true,
@@ -205,18 +215,18 @@ const getStockOverview = async (req, res) => {
     }
 
     // ---- PAGINATED MODE ----
-    const totalItems = await Variant.countDocuments(listFilter);
+    const [countRow] = await Variant.aggregate([...listAggBase, { $count: "n" }]);
+    const totalItems = countRow?.n || 0;
     const pages = Math.max(1, Math.ceil(totalItems / limit));
     const safePage = Math.min(page, pages || 1);
     const skip = (safePage - 1) * limit;
 
-    const variants = await Variant.find(listFilter)
-      .populate(populateProduct)
-      .select(variantSelect)
-      .sort({ created_at: -1, _id: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
+    const variants = await fetchVariantsByAgg([
+      ...listAggBase,
+      { $sort: { created_at: -1, _id: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+    ]);
 
     return res.status(200).json({
       success: true,
@@ -450,6 +460,8 @@ const adjustStock = async (req, res) => {
 
       quantity: newQuantity,
     });
+
+    refreshProductSummary(productId);
 
     res.status(200).json({
       success: true,

@@ -15,6 +15,8 @@
     "migrate:attributes": "node scripts/migrateAttributesPerStore.js",
     "backfill:is-deleted": "node scripts/backfillIsDeleted.js",
     "backfill:address-store": "node scripts/backfillAddressStoreId.js",
+    "backfill:product-summary": "node scripts/backfillProductSummary.js",
+    "migrate:run": "node scripts/migrations/run.js",
     "backfillSubdomains": "node scripts/backfillSubdomains.js --apply",
     "backfill:translations": "node scripts/backfillTranslations.js",
     "translation:check": "node scripts/backfillTranslations.js --check",

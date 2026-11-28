@@ -10,11 +10,12 @@ const StockHistory = require("../models/StockHistory");
 const log = require("../utils/logger");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity } = require("../utils/activityHelper");
+const { aggregateVendorBalances } = require("../utils/vendorBalance");
 const { auditEvent, diffFields, diffItems } = require("../utils/auditHistory");
+const { escapeRegex } = require("../utils/escapeRegex");
 
 const emitPO = (event, data) => { try { const io = getIO(); if (io) io.emit(event, data); } catch {} };
 const emitStock = (data) => emitPO("stockUpdated", data);
-const escapeRegex = (v) => String(v).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // ==========================================
 // 🌐 LOCALE + SLIM HELPERS — admin purchase orders (brands/banner/vendors ka exact pattern)
@@ -575,10 +576,9 @@ const recordPOPayment = async (req, res) => {
       if (txError instanceof TxAbort) return res.status(txError.status).json(txError.body);
       throw txError;
     }
-    // Vendor balance: sirf poore recompute se (pehle ek $inc + phir overwrite hota tha)
-    const sums = await PurchasePayment.aggregate([{ $match: { vendor_id: po.vendor_id } }, { $group: { _id: null, paid: { $sum: "$amount" } } }]);
-    const poSums = await PurchaseOrder.aggregate([{ $match: { vendor_id: po.vendor_id, is_deleted: { $ne: true } } }, { $group: { _id: null, purchased: { $sum: "$total" } } }]);
-    await Vendor.updateOne({ _id: po.vendor_id }, { $set: { total_paid: sums[0]?.paid || 0, total_purchased: poSums[0]?.purchased || 0, balance_payable: Math.max(0, (poSums[0]?.purchased || 0) - (sums[0]?.paid || 0)) } }).catch(() => {});
+    // Vendor balance: saari POs + payments se recompute (shared helper)
+    const balances = await aggregateVendorBalances(po.vendor_id);
+    await Vendor.updateOne({ _id: po.vendor_id }, { $set: balances }).catch(() => {});
     emitPO("po:paymentUpdated", { success: true, data: updatedPO });
     res.status(200).json({ success: true, data: { po: updatedPO, payment: pay } });
   } catch (e) { res.status(400).json({ success: false, message: e.message }); }

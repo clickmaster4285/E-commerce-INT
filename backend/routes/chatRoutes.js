@@ -5,7 +5,7 @@ const chat = require("../controllers/chatController");
 const { limiters } = require("../middleware/rateLimit");
 const router = express.Router();
 const auth = authMiddleware;
-const staff = [auth, chat.canUseInbox, checkPermission("order")];
+const staff = [auth, chat.canUseInbox, checkPermission("orders")];
 const customer = [auth, chat.canUseCustomerChat];
 // Guest chat creation has a legacy IP throttle to reduce anonymous conversation
 // spam. Authenticated chat opening is idempotent and message sends have their own

@@ -57,9 +57,8 @@ const onlyId = (payload) => {
 const PUBLIC_EVENTS = new Map([
   ...["productCreated", "productUpdated", "productDeleted",
     "deal:created", "deal:updated", "deal:deleted",
-    "discountCreated", "discountUpdated", "discountDeleted",
     "discount:created", "discount:updated", "discount:deleted",
-    "banner:created", "banner:updated", "banner:deleted", "bannerCreated", "bannerUpdated", "bannerDeleted",
+    "banner:created", "banner:updated", "banner:deleted",
     "category:created", "category:updated", "category:deleted", "categoryCreated", "categoryUpdated", "categoryDeleted",
     "brand:created", "brand:updated", "brand:deleted", "brandCreated", "brandUpdated", "brandDeleted",
   ].map((event) => [event, onlyId]),
@@ -443,9 +442,11 @@ const initSocket = (server) => {
         return { allowed: true, permissions: doc.permissions || {}, name: doc.name || socket.userName };
       }
       const perms = doc.permissions || {};
+      const { resolvePermissionValue } = require("../middleware/checkPermission");
+      const permValue = resolvePermissionValue(perms, permissionKey);
       const ok = opts.strict
-        ? perms[permissionKey] === true
-        : perms[permissionKey] !== false;
+        ? permValue === true
+        : permValue !== false;
       if (!ok) {
         const err = {
           success: false,
@@ -962,8 +963,25 @@ const initSocket = (server) => {
     });
 
     // ========== PRODUCT EVENTS (PUBLIC read) ==========
-    // "getProducts" socket event hata diya: frontend use nahi karta tha, aur koi bhi
-    // guest poore catalog ka unbounded scan trigger kar sakta tha. Products REST se.
+    socket.on("getProducts", async (_payload, callback) => {
+      try {
+        const Product = require("../models/Product");
+        const { legacyCap } = require("../utils/legacyListCap");
+        const limit = legacyCap(_payload?.limit, 50);
+        const products = await Product.find({ is_deleted: { $ne: true }, status: "active" })
+          .select("name status price_from primary_image variant_count")
+          .sort({ created_at: -1, _id: -1 })
+          .limit(limit)
+          .lean();
+        const payload = { success: true, data: products };
+        if (callback) callback(payload);
+        else socket.emit("productsList", payload);
+      } catch (e) {
+        const err = { success: false, message: e.message };
+        if (callback) callback(err);
+        else socket.emit("productsList", err);
+      }
+    });
 
     // ========== DISCOUNT EVENTS ==========
     socket.on("getDiscounts", async () => {

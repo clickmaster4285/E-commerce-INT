@@ -4,7 +4,7 @@ const Order = require("../models/Order");
 const PurchaseOrder = require("../models/PurchaseOrder");
 const PurchasePayment = require("../models/PurchasePayment");
 
-const roundMoney = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+const { roundMoney } = require("../utils/roundMoney");
 const positiveAmount = (value) => Math.max(0, Number(value) || 0);
 const toDate = (value) => {
   const date = value ? new Date(value) : null;

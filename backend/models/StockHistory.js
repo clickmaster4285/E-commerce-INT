@@ -90,7 +90,7 @@ const stockHistorySchema = new mongoose.Schema(
 
     performed_by: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Employee",
       default: null,
     },
 

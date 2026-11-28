@@ -6,8 +6,7 @@ const Quote = require("../models/Quote");
 const Invoice = require("../models/Invoice");
 const syncLeadCustomer = require("../utils/syncLeadCustomer");
 const { auditEvent, diffFields } = require("../utils/auditHistory");
-
-const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const { escapeRegex } = require("../utils/escapeRegex");
 
 const getCustomersAdmin = async (req, res) => {
   try {

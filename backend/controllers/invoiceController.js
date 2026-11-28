@@ -8,7 +8,8 @@ const { calculateReturnLine, capReturnLines, calculateReturnSettlement, getOrigi
 const StockHistory = require("../models/StockHistory");
 const { getInvoiceStockAdjustments } = require("../utils/invoiceStockAdjustments");
 
-const round = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+const { roundMoney: round } = require("../utils/roundMoney");
+const { escapeRegex } = require("../utils/escapeRegex");
 const actorName = (req) => String(req.user?.name || req.user?.username || req.user?.email || "Administrator").trim();
 const auditValue = (value) => String(value ?? "")
   .replace(/<br\s*\/?>/gi, "\n")
@@ -194,7 +195,7 @@ exports.listInvoices = async (req, res) => {
     const filter = { is_deleted: false };
     const search = String(req.query.search || "").trim();
     if (search) {
-      const regex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const regex = new RegExp(escapeRegex(search), "i");
       filter.$or = [
         { invoice_number: regex },
         { customer_name: regex },

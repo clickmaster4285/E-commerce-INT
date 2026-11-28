@@ -4,6 +4,7 @@ const { getIO } = require("../utils/socket");
 const { pushGlobalActivity } = require("../utils/activityHelper");
 const { queueTranslationSync, hashText } = require("../utils/translationService");
 const log = require("../utils/logger");
+const { escapeRegex } = require("../utils/escapeRegex");
 
 const emitSocket = (event, data) => {
   try {
@@ -185,8 +186,8 @@ const getAttributes = async (req, res) => {
 
     if (search) {
       filter.$or = [
-        { name: { $regex: require("../utils/escapeRegex").escapeRegex(search), $options: "i" } },
-        { code: { $regex: require("../utils/escapeRegex").escapeRegex(search), $options: "i" } },
+        { name: { $regex: escapeRegex(search), $options: "i" } },
+        { code: { $regex: escapeRegex(search), $options: "i" } },
       ];
     }
 
