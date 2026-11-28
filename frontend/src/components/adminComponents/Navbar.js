@@ -10,32 +10,12 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import adminHttp from "@/apis/axiosInstance";
 import { toast } from "sonner";
-import { io } from "socket.io-client";
-import { attachSocketAuthSync } from "@/lib/socketAuthSync";
-import { getBackendOrigin } from "@/lib/tenantHost";
-import { disconnectSidebarSocket } from "./Sidebar";
+import { getAdminSocket, disposeAdminSocket } from "@/hooks/admin/useAdminSocket";
 import AdminLanguageSwitcher from "@/components/adminComponents/AdminLanguageSwitcher";
 import { useTranslation } from "@/i18n/LanguageProvider";
 
-// ✅ GLOBAL singleton socket for navbar
-let navbarSocket = null;
-
 function getNavbarSocket() {
-  if (navbarSocket && navbarSocket.connected) return navbarSocket;
-
-  const SOCKET_URL = getBackendOrigin(); // page host ke saath aligned (tenantHost.js)
-
-  navbarSocket = io(SOCKET_URL, {
-    withCredentials: true,
-    auth: { aud: "admin" }, // backend isi session ka cookie dekhta hai (a_at / u_at)
-    transports: ["websocket", "polling"],
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 500,
-  });
-  attachSocketAuthSync(navbarSocket, "admin");
-
-  return navbarSocket;
+  return getAdminSocket();
 }
 
 const profileOptions = [
@@ -181,13 +161,9 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
       console.error("Logout error:", e);
       toast.error(t("admin.navbar.logoutFailed"));
     } finally {
-      // ✅ Step 1: Dono sockets disconnect karo
-      if (navbarSocket) {
-        navbarSocket.disconnect();
-        navbarSocket = null;
-      }
-      disconnectSidebarSocket();
-      
+      // ✅ Step 1: Shared admin socket drop (Navbar/Sidebar/layout share one)
+      disposeAdminSocket();
+
       // ✅ Step 2: Live user state clear karo
       setLiveUser(null);
       

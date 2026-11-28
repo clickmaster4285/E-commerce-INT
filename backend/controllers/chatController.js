@@ -356,6 +356,22 @@ exports.unreadCount = async (req, res) => {
   catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 
+// GET /chats/admin/counts — one round-trip for inbox tab badges (§9.3)
+exports.adminCounts = async (req, res) => {
+  try {
+    if (!isStaff(req)) return fail(res, 403, "Support access required");
+    const [all, unread, open, closed] = await Promise.all([
+      ChatConversation.countDocuments({}),
+      ChatConversation.countDocuments({ unread_admin_count: { $gt: 0 } }),
+      ChatConversation.countDocuments({ status: "open" }),
+      ChatConversation.countDocuments({ status: "closed" }),
+    ]);
+    res.json({ success: true, data: { all, unread, open, closed } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 exports.getMessages = async (req, res) => {
   try {
     const conversation = await authorize(req, res, req.params.id);

@@ -2,6 +2,7 @@
 import { useTranslation } from "@/i18n/LanguageProvider";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,7 +16,11 @@ import { quoteApi } from "@/apis/admin/quoteApi";import { storeApi } from "@/api
 import { customerApi } from "@/apis/admin/customerApi";
 import { variantApi } from "@/apis/admin/variantApi";
 import { stockApi } from "@/apis/admin/stockApi";
-import QuoteTemplateDesigner, { getSavedQuotePdfDesign, INVOICE_TEMPLATE_STORAGE_KEY } from "@/components/admin/QuoteTemplateDesigner";
+import {
+  getSavedQuotePdfDesign,
+  INVOICE_TEMPLATE_STORAGE_KEY,
+} from "@/components/admin/QuoteTemplateDesigner";
+const QuoteTemplateDesigner = dynamic(() => import("@/components/admin/QuoteTemplateDesigner"), { ssr: false });
 
 const today = () => {const value = new Date();return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;};
 const PAYMENT_TERM_DAYS = { "Due on receipt": 0, "Net 7": 7, "Net 14": 14, "Net 30": 30 };
@@ -67,7 +72,7 @@ export default function NewInvoicePage() {const { t } = useTranslation();
   const { data: rawCustomers = [] } = useQuery({ queryKey: ["invoice-customers"], queryFn: () => customerApi.search("") });
   const { data: nextInvoiceNumber } = useQuery({ queryKey: ["invoice-next-number"], queryFn: invoiceApi.getNextNumber, enabled: !editInvoiceId });
   const { data: editingInvoice, isLoading: isLoadingInvoice } = useQuery({ queryKey: ["invoice-admin", editInvoiceId], queryFn: () => invoiceApi.getById(editInvoiceId), enabled: Boolean(editInvoiceId) });
-  const { data: prefilledCustomer } = useQuery({ queryKey: ["invoice-customer-prefill", prefillCustomerId], queryFn: () => customerApi.getById(prefillCustomerId), enabled: Boolean(prefillCustomerId && !prefillQuoteId) });
+  const { data: prefilledCustomer } = useQuery({ queryKey: ["invoice-customer-prefill", prefillCustomerId], queryFn: () => customerApi.getById(prefillCustomerId, { slim: true }), enabled: Boolean(prefillCustomerId && !prefillQuoteId) });
   const { data: prefilledQuote } = useQuery({ queryKey: ["invoice-quote-prefill", prefillQuoteId], queryFn: () => quoteApi.getById(prefillQuoteId), enabled: Boolean(prefillQuoteId) });const { data: companySettings } = useQuery({ queryKey: ["admin-store-info"], queryFn: storeApi.get });
   const { data: pickerRaw = [], isLoading: productsLoading } = useQuery({ queryKey: ["invoice-variant-picker"], queryFn: () => variantApi.getPicker({ limit: 50 }), staleTime: 2 * 60 * 1000 });
   const customers = useMemo(() => listOf(rawCustomers).filter((customer) => !customer.is_deleted), [rawCustomers]);useEffect(() => { const defaultTerms = companySettings?.invoice_terms_conditions ?? ""; if (!editInvoiceId && !prefillQuoteId && defaultTerms !== undefined && defaultTerms !== null) setForm((current) => ({ ...current, terms: defaultTerms })); }, [editInvoiceId, prefillQuoteId, companySettings?.invoice_terms_conditions]);

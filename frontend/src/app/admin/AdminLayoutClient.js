@@ -13,9 +13,7 @@ import Cookies from 'js-cookie';
 import { useStoreSocketSync } from '../../hooks/admin/useStoreSocketSync';
 import { useShippingSocketSync } from '../../hooks/admin/useShippingSocketSync';
 import { useOrderSocketSync } from '../../hooks/admin/useOrderSocketSync';
-import { io } from 'socket.io-client';
-import { attachSocketAuthSync } from "@/lib/socketAuthSync";
-import { getBackendOrigin } from "@/lib/tenantHost";
+import { getAdminSocket } from '@/hooks/admin/useAdminSocket';
 import { useTranslation } from '../../i18n/LanguageProvider';
 
 // ==========================================
@@ -72,26 +70,8 @@ const SELLER_PENDING_ACTION_REGEX =
 // ==========================================
 // SINGLETON SOCKET
 // ==========================================
-let layoutPermSocket = null;
-
 function getLayoutPermSocket() {
-  if (layoutPermSocket && layoutPermSocket.connected) {
-    return layoutPermSocket;
-  }
-
-  const SOCKET_URL = getBackendOrigin(); // page host ke saath aligned (tenantHost.js)
-
-  layoutPermSocket = io(SOCKET_URL, {
-    withCredentials: true,
-    auth: { aud: "admin" }, // backend isi session ka cookie dekhta hai (a_at / u_at)
-    transports: ['websocket', 'polling'],
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 500,
-  });
-  attachSocketAuthSync(layoutPermSocket, "admin");
-
-  return layoutPermSocket;
+  return getAdminSocket();
 }
 
 // ==========================================j7

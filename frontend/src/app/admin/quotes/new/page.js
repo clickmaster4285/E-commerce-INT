@@ -10,10 +10,12 @@ import { customerApi } from "@/apis/admin/customerApi";
 import { stockApi } from "@/apis/admin/stockApi";
 import { variantApi } from "@/apis/admin/variantApi";
 import CustomerFormModal from "@/components/admin/CustomerFormModal";
-import QuoteTemplateDesigner, {
+import dynamic from "next/dynamic";
+import {
   getSavedQuotePdfDesign,
   QUOTE_TEMPLATE_STORAGE_KEY,
 } from "@/components/admin/QuoteTemplateDesigner";
+const QuoteTemplateDesigner = dynamic(() => import("@/components/admin/QuoteTemplateDesigner"), { ssr: false });
 import { localizedField } from "@/i18n/localize";
 import { toast } from "sonner";
 import {
@@ -265,7 +267,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
   });
   const { data: prefilledCustomer } = useQuery({
     queryKey: ["quote-customer-prefill", customerId],
-    queryFn: () => customerApi.getById(customerId),
+    queryFn: () => customerApi.getById(customerId, { slim: true }),
     enabled: Boolean(customerId && !quoteId),
   });
   const { data: pickerRaw = [], isLoading: productsLoading } = useQuery({

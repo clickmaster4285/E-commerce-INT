@@ -1,3 +1,4 @@
+import { getAdminSocket, disposeAdminSocket } from "@/hooks/admin/useAdminSocket";
 "use client";
 
 import FallbackImage from "@/components/common/FallbackImage";
@@ -13,8 +14,6 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { io } from "socket.io-client";
-import { attachSocketAuthSync } from "@/lib/socketAuthSync";
 import { getBackendOrigin } from "@/lib/tenantHost";
 import { setStoreInfo } from "@/redux/slices/storeInfoSlice";
 import { useQueryClient } from "@tanstack/react-query";
@@ -85,41 +84,12 @@ const allMenuItems = getNavModules();
 // SIDEBAR SOCKET
 // ============================================================
 
-let sidebarSocket = null;
-
 function getSidebarSocket() {
-  const SOCKET_URL = getBackendOrigin(); // page host ke saath aligned (tenantHost.js)
-
-  if (sidebarSocket) return sidebarSocket;
-
-  sidebarSocket = io(SOCKET_URL, {
-    withCredentials: true,
-    auth: { aud: "admin" }, // backend isi session ka cookie dekhta hai (a_at / u_at)
-    transports: ["websocket", "polling"],
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 500,
-    reconnectionDelayMax: 3000,
-    autoConnect: true,
-    forceNew: false,
-  });
-
-  sidebarSocket.on("connect_error", (error) => {
-    // ✅ Silent — error console par show na ho, reconnection waise hi chalega
-  });
-
-  sidebarSocket.on("disconnect", (reason) => {});
-  attachSocketAuthSync(sidebarSocket, "admin");
-
-  return sidebarSocket;
+  return getAdminSocket();
 }
 
 export function disconnectSidebarSocket() {
-  if (sidebarSocket) {
-    sidebarSocket.removeAllListeners();
-    sidebarSocket.disconnect();
-    sidebarSocket = null;
-  }
+  disposeAdminSocket();
 }
 
 // ============================================================
@@ -259,7 +229,7 @@ export default function Sidebar({ onNavigate, userData }) {
   // ============================================================
 
   const handleConnect = useCallback(() => {
-    const socket = sidebarSocket;
+    const socket = getSidebarSocket();
     if (socket && socket.connected) {
       socket.emit("getProfile");
     }
@@ -300,7 +270,7 @@ export default function Sidebar({ onNavigate, userData }) {
       const permissionData = data?.data || data?.user || data;
 
       if (!permissionData || !permissionData.permissions) {
-        if (sidebarSocket?.connected) sidebarSocket.emit("getProfile");
+        if (getSidebarSocket()?.connected) getSidebarSocket().emit("getProfile");
         return;
       }
 
@@ -345,7 +315,7 @@ export default function Sidebar({ onNavigate, userData }) {
       }
 
       setTimeout(() => {
-        if (sidebarSocket?.connected) sidebarSocket.emit("getProfile");
+        if (getSidebarSocket()?.connected) getSidebarSocket().emit("getProfile");
       }, 150);
     },
     [queryClient, pathname, router, socketRole]

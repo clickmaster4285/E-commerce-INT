@@ -109,6 +109,10 @@ export function getAdminSocket() {
   return adminSocket;
 }
 
+export function disposeAdminSocket() {
+  disposeSocket();
+}
+
 export function reconnectAdminSocket() {
   disposeSocket();
   return getAdminSocket();

@@ -91,7 +91,7 @@ const notifyUserSessionExpired = () => {
 };
 
 function createAuthHttp({ refreshUrl, publicAuthPaths, mode, guestBlockedPaths = null }) {
-  const http = axios.create({ withCredentials: true });
+  const http = axios.create({ withCredentials: true, timeout: 15000 });
   let refreshPromise = null;
 
   const startRefresh = () => {

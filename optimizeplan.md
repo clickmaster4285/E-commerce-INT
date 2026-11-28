@@ -987,16 +987,16 @@ Translations are **sliced to the active locale on the server**: send `name` alre
 **P1: move filtering, sorting and paging into MongoDB:**
 - [x] POS products: `posController.js:38-146` loads all products and variants, then filters, sorts and pages in JS, with an undebounced search (`pos/page.js:795`). Project `{_id, sku, title, selling_price, quantity, min_qnt, image}` with `limit 20`, and serve category/brand facets from a separate cached endpoint. — **partly done:** product/variant query narrowed in Mongo first + slim select; facets still full-name scan; FE search debounce still open. `test/adminPickersP1.test.js`
 - [ ] Finance: `/finance/transactions?from&to&type&page` returns the list DTO `{id, kind, category, reference, title, counterparty, amount, date, method, status}`, with `/finance/transactions/:id` for the detail (reads §3.9 `ledger_entries`/`payments`).
-- [ ] Dashboard: the activity panel (§4.3), and `recentOrders` gets a `select` (`dashboardController.js:253`).
+- [x] Dashboard: the activity panel (§4.3), and `recentOrders` gets a `select` (`dashboardController.js:253`). — **partly done:** `recentOrders` + activity queries use `.select` and capped limits; still not reading from `audit_events`/`store_daily_stats`. `test/adminDetailTrimP1.test.js`
 
 **P1: detail endpoints that ship unbounded history:**
 
 | Endpoint | Fix |
 |---|---|
-| `GET /customers/:id` (`customerController.js:107-131`, also `posController.js:688`) returns **every** PosSale, Quote and Invoice in full (items, `pdf_design`, payments, returns, edit_history). The quote and invoice "new" pages use it only to prefill | customer plus counts, then paginated `/customers/:id/sales`, `/quotes` and `/invoices` rows `{number, date, method, total, status}` |
-| `GET /vendors/:id/details` returns 100 POs with full `activity`, and then the page makes **10 `purchaseOrderApi.getById` calls** for payments that the backend already loaded (`vendors/[id]:109-118`, `vendorController.js:212`) | return a slim `payments[]` and remove the N+1 |
+| `GET /customers/:id` (`customerController.js:107-131`, also `posController.js:688`) returns **every** PosSale, Quote and Invoice in full (items, `pdf_design`, payments, returns, edit_history). The quote and invoice "new" pages use it only to prefill | customer plus counts, then paginated `/customers/:id/sales`, `/quotes` and `/invoices` rows `{number, date, method, total, status}` — **partly done:** `?slim=1` prefill; full detail uses true counts + capped (20) slim history rows. Separate paginated sales endpoints still open. `test/adminDetailTrimP1.test.js` |
+| `GET /vendors/:id/details` returns 100 POs with full `activity`, and then the page makes **10 `purchaseOrderApi.getById` calls** for payments that the backend already loaded (`vendors/[id]:109-118`, `vendorController.js:212`) | return a slim `payments[]` and remove the N+1 — **done:** BE slim `payments[]` with `po_number`; FE dropped N+1. `test/adminDetailTrimP1.test.js` |
 | SA `getStore` / `getStoreAdmin` return 100 activity entries; 20 are rendered (`superAdminController.js:734,1146,1198`) | field projection plus paginated `audit_events` (§3.5) |
-| SA `listTeam`/`getTeamMember` put `activities.slice(0,100)` on every list row (never rendered), and the detail page and `ActivityFeed` both **poll every 60s** with 6 queries each (`team/[id]:24`, `ActivityFeed.js:52`) | drop activities from list rows; one feed with no polling (use socket push) |
+| SA `listTeam`/`getTeamMember` put `activities.slice(0,100)` on every list row (never rendered), and the detail page and `ActivityFeed` both **poll every 60s** with 6 queries each (`team/[id]:24`, `ActivityFeed.js:52`) | drop activities from list rows; one feed with no polling (use socket push) — **partly done:** list dropped activities earlier; detail/`ActivityFeed` poll is 5m and activities capped at 20. Socket push still open. `test/adminDetailTrimP1.test.js` |
 | `GET /theme` returns both `draft` and `published`; publish, restore and preview echo both, and `saveDraft` echoes the draft (`themeController.js:39-53,127,181-355`) | draft plus meta; `saveDraft` returns `{draftRevision}` only — **partly done:** `draft_hash` + hash compare; `saveDraft` returns `{draftRevision, draftUpdatedAt}` only. GET still returns both draft and published for the editor. |
 
 **P1: trim list endpoints:**
@@ -1012,7 +1012,7 @@ Translations are **sliced to the active locale on the server**: send `name` alre
 - [x] `useProductSocketSync.js:125-135` prefix-invalidates `["brands"]` (the N+1), every `["products"]` key and every `["product",*]` detail **on each event**. `variantController.js:93,230,274` emits `productUpdated` per variant save, so saving a product with N variants triggers N full refetch waves in every open admin tab, and `useStockSocketSync.js:40-42` refetches stock on top.
   - Patch the caches by id (`setQueryData`), and invalidate only `["product", id]` and the visible list page. Have the backend emit **one** event per save. — **partly done:** FE invalidates only paginated/featured + `["product", id]`; backend still emits per-variant. `test/adminPickersP1.test.js`
 - [x] Chat: one message emits 3 events and `markRead` emits 2 (`chatController.js:405-425`). Each reruns the list and `chat-counts` (4 separate `listAdmin` calls, `chats/page.js:43-64`), which adds up to **about 15 requests per incoming message**. `ChatThread.js:215-226` also refetches the page, although the payload contains the message.
-  - Use `setQueryData` from the payload, one `/chat/admin/counts` aggregate, and debounced search with limits. — **partly done:** FE `setQueryData` on message, narrow onUpdate, debounced search + coalesced inbox refresh; `/chat/admin/counts` still open. `test/adminOptionsP1.test.js`
+  - Use `setQueryData` from the payload, one `/chat/admin/counts` aggregate, and debounced search with limits. — **done:** FE `setQueryData` on message, narrow onUpdate, debounced search + coalesced inbox refresh; `GET /chats/admin/counts` aggregate for tab badges. `test/adminDetailTrimP1.test.js`
 - [x] Dashboard: about 20 event types trigger a full stats recompute (`dashboard/page.js:131-137,1062-1068`). Debounce the invalidation to about 5s and read the precomputed stats (§3.4). — **done:** 5s debounce on socket invalidation. Precomputed stats still §3.4. `test/adminOptionsP1.test.js`
 - [x] `staleTime: 0` overrides the 60s global default (`app/providers.js:17`) in `categories/page.js:357` and `attributes/page.js:520,619`. Remove these. — **done** (60s). `test/adminPickersP1.test.js`
 - [x] Debounce search (300ms, at least 2 characters) in POS products/customers/history (`pos/page.js:482,795,930`), finance (`finance/page.js:315`) and chat. — **done:** 300ms debounce on POS/finance/chat (min-2 still open for some fields). `test/adminOptionsP1.test.js`
@@ -1030,9 +1030,9 @@ Measured from the existing `.next` build. Today home is **940 KB raw / 259 KB gz
   - Invalidate only on a real `socket.io.on("reconnect")`.
   - Use narrow keys by id (with the `{_id}` socket payloads from §9.2).
   - Remove polling wherever the socket already covers it. — **partly done:** removed `refetchInterval` from BannerSlider, DealsSection, DiscountContext, useHomeCatalog.
-- [ ] **Images are not optimized.** There is no `images` block in `next.config.mjs`, so `/_next/image` rejects the remote URLs that `utils/smartImageLoader.js` sends. Private hosts get `?w=&q=` appended, which the backend ignores, so the full-size file is served.
+- [x] **Images are not optimized.** There is no `images` block in `next.config.mjs`, so `/_next/image` rejects the remote URLs that `utils/smartImageLoader.js` sends. Private hosts get `?w=&q=` appended, which the backend ignores, so the full-size file is served.
   - Only 18 of 117 `<FallbackImage>` uses go through next/image (most of them `unoptimized`), plus 15 raw `<img>`.
-  - Add `images: { remotePatterns: [backend/CDN], qualities: [75] }`, and route product cards, banners and the product gallery through next/image with `sizes`.
+  - Add `images: { remotePatterns: [backend/CDN], qualities: [75] }`, and route product cards, banners and the product gallery through next/image with `sizes`. — **partly done:** `images.remotePatterns` + `qualities:[75]` in `next.config.mjs` (dev host + localhost + `/uploads/**`). Wiring FallbackImage/cards to next/image + fixed upload widths still open. `test/adminDetailTrimP1.test.js`
   - Replace the deprecated `priority` prop with `preload` / `fetchPriority="high"` on the LCP image (Next 16 `image.md:291`).
   - Have the backend generate fixed widths (320/640/1080) at upload (§5.6), so the loader can request a real size.
 - [ ] **i18n sends admin strings to every shopper.**
@@ -1044,8 +1044,8 @@ Measured from the existing `.next` build. Today home is **940 KB raw / 259 KB gz
   - Read the `lang` cookie in `(user)/layout.js` and pass only the active namespace.
   - Set `<html lang dir>` on the server.
   - The admin layout already reads the cookie, but it inlines the whole dictionary (about 380 KB) into the HTML; serve the admin namespace as a cached static asset instead.
-- [ ] **Admin opens about 4 WebSocket connections per tab.** `AdminLayoutClient.js:84`, `Navbar.js:28`, `Sidebar.js:95` and `hooks/admin/useAdminSocket.js:96` each call `io()`. The getters reuse a socket only when it is `.connected`, so connects and reconnects create more sockets, and the old ones keep their listeners.
-  - Use **one** `getAdminSocket()` module singleton.
+- [x] **Admin opens about 4 WebSocket connections per tab.** `AdminLayoutClient.js:84`, `Navbar.js:28`, `Sidebar.js:95` and `hooks/admin/useAdminSocket.js:96` each call `io()`. The getters reuse a socket only when it is `.connected`, so connects and reconnects create more sockets, and the old ones keep their listeners.
+  - Use **one** `getAdminSocket()` module singleton. — **done:** Navbar/Sidebar/AdminLayoutClient/chats use `getAdminSocket`; logout calls `disposeAdminSocket`. `test/adminDetailTrimP1.test.js`
   - Storefront: connect the socket only when it is needed (logged in, chat open, or a page with live stock), not for every anonymous visitor (`UserLayoutClient.js:117`).
   - Load `SupportChatWidget` with `next/dynamic` on first open (`UserLayoutClient.js:19,184`). It currently imports `getAdminSocket`.
 - [ ] **Render-blocking fonts.** `app/layout.js:31-37` loads 4 Arabic and Urdu families × 4 weights on every page through a blocking stylesheet, and the "media trick" the comment describes is not there. Meanwhile `Inter` (`globals.css:308`) is never loaded.
@@ -1061,17 +1061,17 @@ Measured from the existing `.next` build. Today home is **940 KB raw / 259 KB gz
 **P2, bundle and structure:**
 - [ ] Lazy-load the remaining heavy editors and charts with `next/dynamic`:
   - [ ] `RichTextEditor` in `admin/terms-conditions/page.js:9` (the tiptap chunk is 430 KB)
-  - [ ] `QuoteTemplateDesigner` in invoices/quotes `new` and `[id]`
+  - [x] `QuoteTemplateDesigner` in invoices/quotes `new` and `[id]` — **partly done:** `new` pages use `next/dynamic`; `[id]` still static. Named helpers still import from the module. `test/adminDetailTrimP1.test.js`
   - [ ] recharts in `admin/dashboard:49` and the super-admin dashboard
   - [ ] `ColorPicker` (`fields.js:30`, `ElementPanel.js:15`)
   - [ ] `VariantForm`
 
   jspdf, html2canvas, leaflet, the VisualEditor and the section registry are already lazy, which is good.
-- [ ] Use `libphonenumber-js/min` instead of `/max` (`AddressForm.js:7`): 84 KB vs 157 KB.
+- [x] Use `libphonenumber-js/min` instead of `/max` (`AddressForm.js:7`): 84 KB vs 157 KB. — **done.** `test/adminDetailTrimP1.test.js`
 - [ ] **Remove Redux.** It is one slice (`redux/slices/storeInfoSlice.js`) mirroring server data, loaded on every storefront page through `providers.js:6`. Use the React Query `storeInfo` key instead, and drop `@reduxjs/toolkit`, `react-redux` and the root Provider. Keep Zustand for the store editor only.
 - [ ] Remove unused dependencies: `react-select` and `next-themes` (no imports). Replace the 3 `react-icons` uses with lucide or inline SVG, and drop that package too.
 - [ ] One `src/lib/queryKeys.js` factory. There are about 150 distinct key heads today, and the store document alone is cached under 4 keys (`storeInfo`, `store`, `admin-store-info`, `store-public`), so invalidations miss some. `setQueryData(["products"], arr)` writes an orphan key (`useUserSocketSync.js:76`).
-- [ ] Axios: add a default `timeout` (for example 15s) to `axios.create`. Today only the refresh call has one, so a hung backend leaves spinners forever.
+- [x] Axios: add a default `timeout` (for example 15s) to `axios.create`. Today only the refresh call has one, so a hung backend leaves spinners forever. — **done:** `timeout: 15000` on shared axios.create. `test/adminDetailTrimP1.test.js`
 - [ ] Split the giant files, starting with the most-edited ones:
   - `admin/products/[id]/page.js` (3,816 lines, 38 `useState`, 7 queries): extract `VariantDetailsDrawer`, `ImageGalleryModal`, `AllAttributesModal` and `SearchableSelectField`
   - `admin/employees/[id]` (2,384)
@@ -1085,13 +1085,13 @@ Measured from the existing `.next` build. Today home is **940 KB raw / 259 KB gz
   - `landing/hero-bg.mp4` is 4.7 MB; compress it, and add a poster image.
   - Convert the 1.7–1.8 MB PNG backgrounds to AVIF/WebP.
   - Add immutable `Cache-Control` for hashed and static media through `headers()`.
-- [ ] `next.config.mjs`: add `poweredByHeader: false`, the `images` block, `cacheComponents`, and `headers()` (§9.1). Make `@next/next/no-img-element` an ESLint error.
-- [ ] Delete dead files (never imported):
-  - `hooks/useEmployeeSocket.js` (919 lines)
-  - `hooks/useSocket.js` (174)
-  - `components/user/Showcase.js` (360), `BrandSection.js` (111), `TrustBar.js` (95), `CategoryBar.js` (87), `BundlesSection.js` (68)
-  - `components/superadmin/PlanModulesPanel.js` (173), `Topbar.js` (115), `ui/index.js` (15)
-  - `components/admin/CalculationSummaryCard.js` (41)
+- [x] `next.config.mjs`: add `poweredByHeader: false`, the `images` block, `cacheComponents`, and `headers()` (§9.1). Make `@next/next/no-img-element` an ESLint error. — **partly done:** `poweredByHeader: false`, `images`, and security `headers()` are in. `cacheComponents` and the img-element ESLint error still open. `test/adminDetailTrimP1.test.js`
+- [x] Delete dead files (never imported):
+  - `hooks/useEmployeeSocket.js` (919 lines) — **done**
+  - `hooks/useSocket.js` (174) — **done**
+  - `components/user/Showcase.js` (360), `BrandSection.js` (111), `TrustBar.js` (95), `CategoryBar.js` (87), `BundlesSection.js` (68) — **done** (Showcase earlier)
+  - `components/superadmin/PlanModulesPanel.js` (173), `Topbar.js` (115), `ui/index.js` (15) — **partly:** PlanModulesPanel removed; Topbar/`ui/index` still present
+  - `components/admin/CalculationSummaryCard.js` (41) — **done**
   - the stale react-select comment block at `admin/store-info/page.js:202`
 
 **Frontend performance budget (enforce in CI with `next build` output and Lighthouse CI):**

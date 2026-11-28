@@ -269,15 +269,20 @@ const getVendorWithPOs = async (req, res) => {
         total_paid: totalPaid,
         balance_payable: Math.max(0, totalPurchased - totalPaid),
         purchaseOrders: pos.map(slimPurchaseOrder),
-        payments: payments.map((pay) => ({
-          _id: pay._id,
-          amount: pay.amount,
-          method: pay.method,
-          reference: pay.reference,
-          note: pay.note,
-          po_id: pay.po_id,
-          created_at: pay.created_at,
-        })),
+        payments: (() => {
+          const poNumberById = new Map(pos.map((p) => [String(p._id), p.po_number || ""]));
+          return payments.map((pay) => ({
+            _id: pay._id,
+            amount: pay.amount,
+            method: pay.method,
+            reference: pay.reference,
+            note: pay.note,
+            po_id: pay.po_id,
+            po_number: poNumberById.get(String(pay.po_id)) || "",
+            paid_at: pay.created_at,
+            created_at: pay.created_at,
+          }));
+        })(),
       },
     });
   } catch (e) { res.status(400).json({ success: false, message: e.message }); }

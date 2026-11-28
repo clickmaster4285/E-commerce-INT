@@ -21,7 +21,7 @@ export default function TeamMemberPage() {
   const [notice, setNotice] = useState(null);
 
   // har minute refresh — Online / Last seen up to date rahe
-  const { data, isLoading, isError } = useQuery({ queryKey: ["superadmin-team-member", String(id)], queryFn: () => superAdminApi.getTeamMember(id), enabled: !!id, retry: 1, refetchInterval: 60 * 1000 });
+  const { data, isLoading, isError } = useQuery({ queryKey: ["superadmin-team-member", String(id)], queryFn: () => superAdminApi.getTeamMember(id), enabled: !!id, retry: 1, refetchInterval: 5 * 60 * 1000 });
   const member = data?.data?.member || null;
 
   const refresh = () => { qc.invalidateQueries({ queryKey: ["superadmin-team-member", String(id)] }); qc.invalidateQueries({ queryKey: ["superadmin-team"] }); };

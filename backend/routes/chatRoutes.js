@@ -22,6 +22,7 @@ router.post("/general", ...customer, chat.openGeneral);
 router.post("/order/:orderId", ...customer, chat.openForOrder);
 router.get("/mine", ...customer, chat.listMine);
 router.get("/admin/unread-count", ...staff, chat.unreadCount);
+router.get("/admin/counts", ...staff, chat.adminCounts);
 router.get("/admin/conversations", ...staff, chat.listAdmin);
 router.patch("/admin/:id/status", ...staff, chat.updateStatus);
 router.patch("/:id/context", auth, chat.updateInquiryContext);

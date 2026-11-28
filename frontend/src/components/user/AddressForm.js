@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Country, State, City } from "country-state-city";
-import { parsePhoneNumberFromString } from "libphonenumber-js/max";
+import { parsePhoneNumberFromString } from "libphonenumber-js/min";
 import { addressApi } from "@/apis/user/addressApi";
 import { useCurrentLocation } from "../../hooks/user/useCurrentLocation";
 import { MapPin, ChevronDown, Loader2, Check, X } from "lucide-react";

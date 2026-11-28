@@ -307,6 +307,7 @@ const getDashboardStats = async (req, res) => {
     const recentOrdersTotal = await Order.countDocuments({});
     const recentOrdersPagination = makePage(recentOrdersTotal, req.query.recentOrdersPage);
     const recentOrdersRaw = await Order.find({})
+      .select("order_number total status payment.status created_at items.image address_snapshot.full_name user_id")
       .sort({ created_at: -1 })
       .skip(recentOrdersPagination.skip)
       .limit(limit)
@@ -324,11 +325,13 @@ const getDashboardStats = async (req, res) => {
     }));
 
     // ---- Recent activity — synthesized from real collection changes ----
+    // Cap each source — activity panel only shows a short feed (§9.3)
+    const actLimit = Math.min(40, Math.max(limit * 2, 20));
     const [actOrders, actProducts, actDiscounts, actBrands] = await Promise.all([
-      Order.find({}).sort({ created_at: -1 }).select("order_number address_snapshot created_at").lean(),
-      Product.find({}).sort({ created_at: -1 }).select("name created_at").lean(),
-      Discount.find({}).sort({ createdAt: -1 }).select("name createdAt").lean(),
-      Brand.find({}).sort({ created_at: -1 }).select("name created_at").lean(),
+      Order.find({}).sort({ created_at: -1 }).select("order_number address_snapshot.full_name created_at").limit(actLimit).lean(),
+      Product.find({}).sort({ created_at: -1 }).select("name created_at").limit(actLimit).lean(),
+      Discount.find({}).sort({ createdAt: -1 }).select("name createdAt").limit(actLimit).lean(),
+      Brand.find({}).sort({ created_at: -1 }).select("name created_at").limit(actLimit).lean(),
     ]);
     const activities = [
       ...actOrders.map((o) => ({

@@ -30,6 +30,7 @@ export const adminChatApi = {
     return { ...response.data, data: response.data?.data ?? [] };
   },
   unreadCount: async () => unwrap(await adminHttp.get("/chats/admin/unread-count")),
+  counts: async () => unwrap(await adminHttp.get("/chats/admin/counts")),
   details: async (id) => unwrap(await adminHttp.get(`/chats/${id}`)),
   messages: async (id, before) => unwrap(await adminHttp.get(`/chats/${id}/messages`, { params: { limit: 100, ...(before ? { before } : {}) } })),
   send: async (id, text, context) => unwrap(await adminHttp.post(`/chats/${id}/messages`, { text, ...(context ? { context } : {}) })),

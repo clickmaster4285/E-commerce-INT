@@ -49,7 +49,7 @@ export default function ActivityFeed({ queryKey, fetcher, title, description, wh
     queryFn: () => fetcher({ search: debounced, page, limit: PAGE_SIZE }),
     retry: 1,
     placeholderData: (prev) => prev,
-    refetchInterval: 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
   });
   const items = useMemo(() => data?.data?.items || [], [data]);
   const total = data?.data?.total || 0;

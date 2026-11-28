@@ -47,11 +47,8 @@ export default function AdminChatsPage() {
   const conversations = useMemo(() => conversationsQuery.data?.data || [], [conversationsQuery.data]);
   const countsQuery = useQuery({
     queryKey: ["chat-counts"],
-    queryFn: async () => {
-      const params = { limit: 1 };
-      const results = await Promise.all(FILTERS.map(({ key }) => adminChatApi.list({ ...params, status: key })));
-      return Object.fromEntries(FILTERS.map(({ key }, index) => [key, results[index].pagination?.total || 0]));
-    },
+    queryFn: () => adminChatApi.counts(),
+    staleTime: 30 * 1000,
   });
   const selected = useMemo(() => conversations.find((item) => String(item._id) === String(selectedId)) || null, [conversations, selectedId]);
   const activeConversation = selected || conversations[0] || null;

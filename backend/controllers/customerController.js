@@ -104,26 +104,66 @@ const searchCustomers = async (req, res) => {
 
 const getCustomerById = async (req, res) => {
   try {
-    const customer = await Customer.findOne({ _id: req.params.id, is_deleted: { $ne: true } }).lean();
+    const customer = await Customer.findOne({ _id: req.params.id, is_deleted: { $ne: true } })
+      .select("-translation_source -translation_status -__v")
+      .lean();
     if (!customer) return res.status(404).json({ success: false, message: "Customer not found" });
 
-    const [sales, quotes, invoices] = await Promise.all([
-      PosSale.find({ customer_id: customer._id }).sort({ created_at: -1 }).limit(50).lean(),
-      Quote.find({ customer_id: customer._id, is_deleted: { $ne: true } }).select("-activity").sort({ created_at: -1 }).limit(50).lean(),
-      Invoice.find({ customer_id: customer._id, is_deleted: { $ne: true } }).select("-activity").sort({ created_at: -1 }).limit(50).lean(),
+    // Prefill-only for quote/invoice new pages (§9.3)
+    if (String(req.query.slim || "") === "1") {
+      return res.status(200).json({
+        success: true,
+        data: {
+          _id: customer._id,
+          name: customer.name || "",
+          email: customer.email || "",
+          phone: customer.phone || "",
+          address: customer.address || "",
+          notes: customer.notes || "",
+        },
+      });
+    }
+
+    const salesFilter = { customer_id: customer._id };
+    const quoteFilter = { customer_id: customer._id, is_deleted: { $ne: true } };
+    const invoiceFilter = { customer_id: customer._id, is_deleted: { $ne: true } };
+
+    const [sales, quotes, invoices, total_sales, quote_count, invoice_count, spentAgg] = await Promise.all([
+      PosSale.find(salesFilter)
+        .select("sale_number total status payment.method created_at items.product_name items.quantity")
+        .sort({ created_at: -1 })
+        .limit(20)
+        .lean(),
+      Quote.find(quoteFilter)
+        .select("quote_number total status quote_date created_at")
+        .sort({ created_at: -1 })
+        .limit(20)
+        .lean(),
+      Invoice.find(invoiceFilter)
+        .select("invoice_number total status invoice_date created_at")
+        .sort({ created_at: -1 })
+        .limit(20)
+        .lean(),
+      PosSale.countDocuments(salesFilter),
+      Quote.countDocuments(quoteFilter),
+      Invoice.countDocuments(invoiceFilter),
+      PosSale.aggregate([
+        { $match: salesFilter },
+        { $group: { _id: null, total: { $sum: { $ifNull: ["$total", 0] } } } },
+      ]),
     ]);
-    const totalSpent = sales.reduce((sum, sale) => sum + (Number(sale.total) || 0), 0);
+    const total_spent = Number(spentAgg[0]?.total) || 0;
 
     res.status(200).json({
       success: true,
       data: {
         ...customer,
-        total_sales: sales.length,
-        total_spent: totalSpent,
+        total_sales,
+        total_spent,
         recent_sales: sales,
-        quote_count: quotes.length,
+        quote_count,
         quote_history: quotes,
-        invoice_count: invoices.length,
+        invoice_count,
         invoice_history: invoices,
       },
     });

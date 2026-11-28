@@ -1257,7 +1257,7 @@ const getStoreAdmin = async (req, res) => {
           sellerPending: !!admin.seller_pending,
           created_at: admin.created_at,
           updated_at: admin.updated_at,
-          activities: Array.isArray(admin.activities) ? admin.activities.slice(0, 100) : [],
+          activities: Array.isArray(admin.activities) ? admin.activities.slice(0, 20) : [],
           approval: application ? { status: application.status, requestedAt: application.created_at, reviewedAt: application.reviewed_at, reviewedBy: application.reviewed_by || null, rejectionReason: application.rejection_reason || "" } : null,
         },
         store: store
@@ -1556,7 +1556,7 @@ const publicMember = (m, me, { includeActivities = false } = {}) => ({
   canManage: !manageBlockReason(m, me),
   // List rows never render activities — only detail (§9.3)
   ...(includeActivities
-    ? { activities: Array.isArray(m.activities) ? m.activities.slice(0, 100) : [] }
+    ? { activities: Array.isArray(m.activities) ? m.activities.slice(0, 20) : [] }
     : {}),
 });
 

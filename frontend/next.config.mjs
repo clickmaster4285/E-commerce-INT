@@ -87,6 +87,25 @@ const nextConfig = {
   // X-Powered-By: Next.js header nahi (framework fingerprint)
   poweredByHeader: false,
 
+  // Storefront/admin product images from backend /uploads (§9.4)
+  images: {
+    qualities: [75],
+    remotePatterns: [
+      { protocol: 'http', hostname: 'localhost', pathname: '/uploads/**' },
+      { protocol: 'http', hostname: '127.0.0.1', pathname: '/uploads/**' },
+      ...(DEV_IP ? [{ protocol: 'http', hostname: DEV_IP, pathname: '/uploads/**' }] : []),
+      ...(DEV_ROOT
+        ? [
+            { protocol: 'http', hostname: DEV_ROOT, pathname: '/uploads/**' },
+            { protocol: 'http', hostname: `*.${DEV_ROOT}`, pathname: '/uploads/**' },
+            { protocol: 'https', hostname: DEV_ROOT, pathname: '/uploads/**' },
+            { protocol: 'https', hostname: `*.${DEV_ROOT}`, pathname: '/uploads/**' },
+          ]
+        : []),
+      { protocol: 'https', hostname: '**', pathname: '/uploads/**' },
+    ],
+  },
+
   /**
    * 🔒 SECURITY HEADERS (optimizeplan.md §9.1)
    * - nosniff / Referrer-Policy / Permissions-Policy: har page.

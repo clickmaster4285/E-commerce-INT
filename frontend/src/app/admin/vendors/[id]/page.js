@@ -105,19 +105,13 @@ export default function VendorDetailPage({ params }) {
     onSuccess: () => { toast.success(tToast("updated")); setShowModal(false); invalidate(); },
     onError: (e) => toast.error(e?.response?.data?.message || tToast("saveFailed")),
   });
-  // Payments of recent POs for the activity timeline + payments tab (existing detail endpoint).
-  const recentIds = useMemo(() => (detail?.purchaseOrders || []).slice(0, 10).map((p) => p._id), [detail]);
-  const { data: paymentsByPo, isLoading: paymentsLoading, isError: paymentsError, refetch: refetchPayments } = useQuery({
-    queryKey: ["vendor-po-payments", id],
-    queryFn: async () => {
-      const results = await Promise.all(recentIds.map(async (poId) => {
-        const res = await purchaseOrderApi.getById(poId);
-        return (res?.data?.payments || []).map((payment) => ({ ...payment, po_id: poId, po_number: res?.data?.po_number }));
-      }));
-      return results.flat().sort((a, b) => new Date(b.paid_at || b.created_at) - new Date(a.paid_at || a.created_at));
-    },
-    enabled: !!detail && recentIds.length > 0,
-  });
+  const paymentsByPo = useMemo(() => {
+    const rows = Array.isArray(detail?.payments) ? detail.payments : [];
+    return [...rows].sort((a, b) => new Date(b.paid_at || b.created_at) - new Date(a.paid_at || a.created_at));
+  }, [detail]);
+  const paymentsLoading = false;
+  const paymentsError = false;
+  const refetchPayments = () => qc.invalidateQueries({ queryKey: ["vendor", id] });
 
   const events = useMemo(() => {
     if (!detail) return [];
