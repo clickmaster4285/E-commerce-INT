@@ -123,7 +123,6 @@ export default function DealsSection({ embedded = false, heading = "" }) {
     queryKey: ["activeDeals"],
     queryFn: dealApi.getActive,
     staleTime: 60 * 1000,
-    refetchInterval: 3 * 60 * 1000,
   });
   const prioritizedDeals = useMemo(
     () =>

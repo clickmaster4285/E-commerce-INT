@@ -163,10 +163,9 @@ export default function BannerSlider({
     queryFn: () => bannerApi.getActive({ limit: 12, locale }),
     // ✅ SSR initialData (R1): key/fn/polling same; server fail → client fetch
     initialData: initialBanners ?? undefined,
-    staleTime: 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
-    refetchInterval: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
+    refetchOnMount: initialBanners ? false : true,
+    refetchOnWindowFocus: false,
     enabled: !usingCustom,
   });
   const banners = usingCustom ? customSlides : fetchedBanners;

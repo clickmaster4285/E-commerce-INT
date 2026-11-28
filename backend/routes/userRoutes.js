@@ -19,6 +19,7 @@ const {
   getCheckoutDraft,
   updateCheckoutDraft,
   deleteCheckoutDraft,
+  getWishlistIds,
   getWishlist,
   toggleWishlist,
   changePasswordREST,
@@ -106,6 +107,7 @@ router.get("/checkout-drafts/:id", authMiddleware.requireUser, getCheckoutDraft)
 router.put("/checkout-drafts/:id", authMiddleware.requireUser, updateCheckoutDraft);
 router.delete("/checkout-drafts/:id", authMiddleware.requireUser, deleteCheckoutDraft);
 // ✅ NEW: Wishlist routes
+router.get("/wishlist/ids", authMiddleware.requireUser, getWishlistIds);
 router.get("/wishlist", authMiddleware.requireUser, getWishlist);
 router.put("/wishlist/toggle", authMiddleware.requireUser, toggleWishlist);
 router.post("/change-password", authMiddleware.requireUser, changePasswordREST);

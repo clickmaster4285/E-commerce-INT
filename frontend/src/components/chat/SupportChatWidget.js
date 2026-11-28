@@ -163,18 +163,18 @@ export default function SupportChatWidget() {
   const adminMode = isStaffRole(userRole);
   const customerMode = Boolean(user && !adminMode);
   const adminSocket = adminMode ? getAdminSocket() : null;
-  const ordersQuery = useQuery({ queryKey: ["myOrders"], queryFn: orderApi.myOrders, enabled: customerMode, staleTime: 60_000, retry: false });
+  const ordersQuery = useQuery({ queryKey: ["myOrders"], queryFn: orderApi.myOrders, enabled: customerMode && open, staleTime: 60_000, retry: false });
   const customerChatsQuery = useQuery({
     queryKey: ["customer-chat-conversations"],
     queryFn: customerChatApi.listMine,
-    enabled: customerMode,
+    enabled: customerMode && open,
     refetchOnWindowFocus: false,
     retry: false,
   });
   const adminChatsQuery = useQuery({
     queryKey: ["chat-conversations", "all", ""],
     queryFn: () => adminChatApi.list({ status: "all", limit: 50 }),
-    enabled: adminMode,
+    enabled: adminMode && open,
     refetchOnWindowFocus: false,
     retry: false,
   });

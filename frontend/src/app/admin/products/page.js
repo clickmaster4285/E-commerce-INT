@@ -343,7 +343,7 @@ const [viewMode, setViewMode] = useState(() => {
   // Dedicated stats → fallback: agar stats API fail ho jaye to list ke (legacy) stats ya current page se values.
   const productStats = summaryData || productsData?.stats || null;
   const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: categoryApi.getAll, retry: false });
-  const { data: brands = [] } = useQuery({ queryKey: ["brands"], queryFn: brandApi.getAll, retry: false });
+  const { data: brands = [] } = useQuery({ queryKey: ["brand-options"], queryFn: () => brandApi.getOptions(), retry: false });
 
   useEffect(() => {
     if (formData.category_id) {

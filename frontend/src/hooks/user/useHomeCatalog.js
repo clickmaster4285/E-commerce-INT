@@ -74,7 +74,6 @@ export function useHomeCatalog(initialFilters = {}, opts = {}) {
     queryKey: ["activeDeals"],
     queryFn: dealApi.getActive,
     staleTime: 60 * 1000,
-    refetchInterval: 3 * 60 * 1000,
   });
 
   const [filters, setFilters] = useState(() => createEmptyFilters(initialFilters));

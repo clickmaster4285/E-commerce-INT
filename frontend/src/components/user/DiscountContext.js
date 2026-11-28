@@ -14,7 +14,6 @@ export function useDiscounts() {
     queryKey: ["publicDiscounts"],
     queryFn: () => discountApi.getPublic(),
     staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
     retry: 1,
   });
 
@@ -22,7 +21,6 @@ export function useDiscounts() {
     queryKey: ["activeDeals"],
     queryFn: () => dealApi.getActive(),
     staleTime: 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
     retry: 1,
   });
 

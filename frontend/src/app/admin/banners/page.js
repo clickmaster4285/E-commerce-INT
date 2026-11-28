@@ -859,7 +859,7 @@ export default function BannersPage() {
   const products = useMemo(() => normalizeArrayResponse(productsResponse), [productsResponse]);
   const { data: categoriesResponse = [] } = useQuery({ queryKey: ["admin-categories-list"], queryFn: categoryApi.getAll, staleTime: 60000 });
   const categories = useMemo(() => normalizeArrayResponse(categoriesResponse), [categoriesResponse]);
-  const { data: brandsResponse = [] } = useQuery({ queryKey: ["admin-brands-list"], queryFn: brandApi.getAll, staleTime: 60000 });
+  const { data: brandsResponse = [] } = useQuery({ queryKey: ["admin-brands-list"], queryFn: () => brandApi.getOptions(), staleTime: 60000 });
   const brands = useMemo(() => normalizeArrayResponse(brandsResponse), [brandsResponse]);
 
   // ✅ Stats server counts se (poore filtered collection ke — sirf current page

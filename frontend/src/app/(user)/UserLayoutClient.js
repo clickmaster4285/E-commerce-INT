@@ -113,7 +113,7 @@ function NavItem({ icon, label, active }) {
   );
 }
 
-export default function UserLayoutClient({ children }) {
+export default function UserLayoutClient({ children, initialStore = null }) {
   useUserSocketSync();
   const { dir, locale } = useTranslation();
   const pathname = usePathname();
@@ -128,7 +128,8 @@ export default function UserLayoutClient({ children }) {
   useEffect(() => {
     const onSessionExpired = () => {
       queryClient.setQueryData(["userProfile"], null);
-      queryClient.setQueryData(["wishlist"], []);
+      queryClient.setQueryData(["wishlist", "ids"], []);
+      queryClient.setQueryData(["wishlist", "products"], []);
     };
     window.addEventListener("user-session-expired", onSessionExpired);
     return () => window.removeEventListener("user-session-expired", onSessionExpired);
@@ -137,6 +138,7 @@ export default function UserLayoutClient({ children }) {
   const { data: store } = useQuery({
     queryKey: ["storeInfo"],
     queryFn: storeApi.getPublic,
+    initialData: initialStore || undefined,
     staleTime: 5 * 60 * 1000,
   });
 

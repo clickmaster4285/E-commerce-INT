@@ -1233,7 +1233,21 @@ const updatePhone = async (req, res) => {
 ;
 
 // ==========================================
-// ✅ GET WISHLIST (populated products)
+// ✅ GET WISHLIST IDS — header/nav count only (§9.2)
+// ==========================================
+const getWishlistIds = async (req, res) => {
+  try {
+    const wishlistDoc = await Wishlist.findOne({ user_id: req.user._id }).select("products").lean();
+    const ids = (wishlistDoc?.products || []).map((id) => String(id));
+    return res.json({ success: true, ids, count: ids.length });
+  } catch (error) {
+    log.error("getWishlistIds error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ==========================================
+// ✅ GET WISHLIST (populated products) — /wishlist page only
 // ==========================================
 const getWishlist = async (req, res) => {
   try {
@@ -1255,6 +1269,7 @@ const getWishlist = async (req, res) => {
         product_id: { $in: products.map((p) => p._id) },
         is_deleted: { $ne: true },
       })
+        .select("-cost_price -min_qnt -max_qnt -topup -createdby -updatedby -deletedby -translation_source -translation_status")
         .sort({ created_at: 1, _id: 1 })
         .lean();
       const variantsMap = {};
@@ -1701,6 +1716,7 @@ module.exports = {
   getCheckoutDraft,
   updateCheckoutDraft,
   deleteCheckoutDraft,
+  getWishlistIds,
   getWishlist,
   toggleWishlist,
 };

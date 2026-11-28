@@ -22,6 +22,9 @@ export const orderApi = {
 
   myOrders: () => userHttp.get("/orders/my").then((res) => res.data?.data || []),
 
+  myOrdersSummary: () =>
+    userHttp.get("/orders/my/summary").then((res) => res.data?.data || { total: 0, active: 0, byStatus: {} }),
+
   // ✅ NEW — server-side paginated list with filters
   getMyOrdersPaginated: ({ page = 1, limit = 10, status = "all", search = "", sort = "newest", timeRange = "all" } = {}) =>
     userHttp

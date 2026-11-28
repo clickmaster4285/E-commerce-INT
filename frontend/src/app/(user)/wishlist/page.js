@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { useWishlist } from "@/components/user/WishlistContext";
 import ProductCard from "@/components/user/ProductCard";
+import { userHttp } from "@/apis/axiosInstance";
+import { hasAuthSession } from "@/lib/authSession";
 import { Heart, Loader2, ShoppingBag } from "lucide-react";
 
 // ✅ Ek waqt me kitne dikhein (load more — khatam ho to button hide)
@@ -14,7 +17,19 @@ const PAGE_SIZE = 20;
    compact=true (account tab): page chrome (title header, page paddings)
    hide — sirf loading / empty / grid render hota hai. */
 export default function WishlistPage({ compact = false }) {
-  const { wishlist, count, loading } = useWishlist();
+  const { count } = useWishlist();
+  const loggedIn = typeof window !== "undefined" && hasAuthSession("user");
+  const { data: wishlist = [], isLoading: productsLoading } = useQuery({
+    queryKey: ["wishlist", "products"],
+    queryFn: async () => {
+      const res = await userHttp.get("/users/wishlist");
+      return res.data?.wishlist || [];
+    },
+    enabled: loggedIn,
+    retry: false,
+    staleTime: 60 * 1000,
+  });
+  const loading = productsLoading;
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [seenCount, setSeenCount] = useState(count);
 

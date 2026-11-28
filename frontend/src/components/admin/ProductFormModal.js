@@ -180,8 +180,8 @@ export default function ProductFormModal({ open, initialProduct = null, onClose,
 
   const allCountries = useMemo(() => Country.getAllCountries().map((c) => ({ name: c.name, isoCode: c.isoCode })), []);
 
-  const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: categoryApi.getAll, retry: false, enabled: open });
-  const { data: brands = [] } = useQuery({ queryKey: ["brands"], queryFn: brandApi.getAll, retry: false, enabled: open });
+  const { data: categories = [] } = useQuery({ queryKey: ["category-options"], queryFn: () => categoryApi.getOptions(), retry: false, enabled: open });
+  const { data: brands = [] } = useQuery({ queryKey: ["brand-options"], queryFn: () => brandApi.getOptions(), retry: false, enabled: open });
 
   useEffect(() => {
     if (!open) return;

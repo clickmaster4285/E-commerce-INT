@@ -390,14 +390,14 @@ export default function Header() {
   const { data: searchData } = useQuery({
     queryKey: ["headerSearch", debouncedSearch],
     queryFn: () =>
-      productApi.getAllPaginated({ page: 1, limit: 8, search: debouncedSearch }),
-    enabled: debouncedSearch.length >= 1,
+      productApi.getAllPaginated({ page: 1, limit: 8, search: debouncedSearch, slim: 1 }),
+    enabled: debouncedSearch.length >= 2,
     staleTime: 60 * 1000,
     retry: 1,
     placeholderData: (previousData) => previousData,
   });
   const searchResults = useMemo(
-    () => (debouncedSearch.length >= 1 ? searchData?.products || [] : []),
+    () => (debouncedSearch.length >= 2 ? searchData?.products || [] : []),
     [debouncedSearch, searchData],
   );
 

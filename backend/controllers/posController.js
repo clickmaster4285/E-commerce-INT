@@ -711,6 +711,32 @@ const updatePosSale = async (req, res) => {
   }
 };
 
+// GET /pos/summary — overview counters without loading sales rows (§9.3)
+const getPosSummary = async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const [todayCount, todayRevenueAgg, totalCount] = await Promise.all([
+      PosSale.countDocuments({ created_at: { $gte: today } }),
+      PosSale.aggregate([
+        { $match: { created_at: { $gte: today } } },
+        { $group: { _id: null, revenue: { $sum: "$total" } } },
+      ]),
+      PosSale.countDocuments({}),
+    ]);
+    return res.status(200).json({
+      success: true,
+      data: {
+        todayCount,
+        todayRevenue: todayRevenueAgg[0]?.revenue || 0,
+        totalCount,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 const getCustomerPosHistory = async (req, res) => {
   try {
     const { legacyCap } = require("../utils/legacyListCap");
@@ -734,5 +760,6 @@ module.exports = {
   returnPosSaleItems,
   createPosSale,
   updatePosSale,
+  getPosSummary,
   getCustomerPosHistory,
 };

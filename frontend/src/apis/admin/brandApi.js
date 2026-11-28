@@ -23,6 +23,12 @@ export const adminBrandApi = {
       return [];
     }),
 
+  // Dropdown / picker — no product N+1 (§9.3)
+  getOptions: ({ search = "", limit = 50, locale = "en" } = {}) =>
+    adminHttp
+      .get("/brands/admin/options", { params: { search: search || undefined, limit, locale } })
+      .then((res) => (Array.isArray(res.data?.data) ? res.data.data : [])),
+
   // ✅ Server side pagination — page/limit/search/status/country + sorting
   getAllPaginated: ({ page = 1, limit = 10, search = "", status = "all", country = "all", sort = "", order = "", locale = "en" } = {}) => {
     const params = { page, limit, locale };

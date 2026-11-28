@@ -31,10 +31,13 @@ export async function generateMetadata() {
 // Store editor ka published theme server par hi — CSS variables SSR me
 // lagte hain (color flash nahi). Fail → null → purana default layout.
 export default async function Layout({ children }) {
-  const { theme, translations } = await getPublishedThemeData();
+  const [{ theme, translations }, store] = await Promise.all([
+    getPublishedThemeData(),
+    getPublicStore(),
+  ]);
   return (
     <StoreThemeProvider initialTheme={theme} translations={translations}>
-      <UserLayoutClient>{children}</UserLayoutClient>
+      <UserLayoutClient initialStore={store}>{children}</UserLayoutClient>
     </StoreThemeProvider>
   );
 }

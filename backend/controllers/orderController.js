@@ -541,6 +541,31 @@ const placeOrder = async (req, res) => {
 };
 
 // ==========================================
+// GET /api/orders/my/summary — account stats (counts only, §9.2)
+const getMyOrdersSummary = async (req, res) => {
+  try {
+    const rows = await Order.aggregate([
+      { $match: { user_id: req.user._id } },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]);
+    const byStatus = {};
+    let total = 0;
+    for (const row of rows) {
+      byStatus[row._id] = row.count;
+      total += row.count;
+    }
+    const active = total
+      - (byStatus.delivered || 0)
+      - (byStatus.cancelled || 0);
+    return res.status(200).json({
+      success: true,
+      data: { total, active, byStatus },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // GET /api/orders/my — Meri orders (optional server-side pagination)
 // ✅ Non-breaking: agar ?limit= nahi bheja to purana full-array response
 // ==========================================
@@ -1416,6 +1441,7 @@ const updatePaymentStatus = async (req, res) => {
 
 module.exports = {
   placeOrder,
+  getMyOrdersSummary,
   getMyOrders,
   getOrderById,
   getAllOrders,

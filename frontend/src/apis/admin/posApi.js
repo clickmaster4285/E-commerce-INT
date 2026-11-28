@@ -11,6 +11,7 @@ export const posApi = {
       };
     }),
   getSales: (params = {}) => adminHttp.get("/pos/sales", { params }).then((res) => res.data || {}),
+  getSummary: () => adminHttp.get("/pos/summary").then((res) => res.data?.data || res.data),
   getReturns: (params = {}) => adminHttp.get("/pos/returns", { params }).then((res) => res.data || {}),
   getSale: (id, params = {}) => adminHttp.get(`/pos/sales/${id}`, { params }).then((res) => res.data?.data || res.data),
   createSale: (data) => adminHttp.post("/pos/sales", data).then((res) => res.data),

@@ -501,13 +501,14 @@ export default function AccountPage() {
     retry: false,
   });
 
-  const { data: orders = [] } = useQuery({
-    queryKey: ["myOrders"],
+  const { data: orderSummary = { total: 0, active: 0, byStatus: {} } } = useQuery({
+    queryKey: ["myOrders", "summary"],
     queryFn: async () => {
-      const res = await userHttp.get("/orders/my");
-      return res.data?.data || [];
+      const res = await userHttp.get("/orders/my/summary");
+      return res.data?.data || { total: 0, active: 0, byStatus: {} };
     },
     enabled: !!user,
+    staleTime: 60 * 1000,
   });
 
   const { data: addresses = [] } = useQuery({
@@ -551,9 +552,9 @@ export default function AccountPage() {
     user.is_deleted || String(user.status || "").toLowerCase() === "inactive"
       ? "Inactive"
       : "Active";
-  const activeCount = orders.filter((o) => !["delivered", "cancelled"].includes(o.status)).length;
+  const activeCount = Number(orderSummary.active) || 0;
   const counts = {
-    orders: orders.length,
+    orders: Number(orderSummary.total) || 0,
     wishlist: wishlistCount,
     address: addresses.length,
   };
@@ -570,7 +571,7 @@ export default function AccountPage() {
   };
 
   const stats = [
-    { label: "Total Orders", value: orders.length, icon: Package, onClick: () => navigate("orders") },
+    { label: "Total Orders", value: Number(orderSummary.total) || 0, icon: Package, onClick: () => navigate("orders") },
     { label: "Active Orders", value: activeCount, icon: Truck, onClick: () => navigate("orders") },
     { label: "Wishlist", value: wishlistCount, icon: Heart, onClick: () => navigate("wishlist") },
     { label: "Addresses", value: addresses.length, icon: MapPin, onClick: () => navigate("address") },

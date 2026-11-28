@@ -557,7 +557,7 @@ export default function DiscountsPage() {
   const products = useMemo(() => normalizeArrayResponse(productsResponse), [productsResponse]);
   const { data: categoriesResponse } = useQuery({ queryKey: ["discount-categories"], queryFn: categoryApi.getAll, staleTime: 60000, enabled: showModal });
   const categories = useMemo(() => normalizeArrayResponse(categoriesResponse), [categoriesResponse]);
-  const { data: brandsResponse } = useQuery({ queryKey: ["discount-brands"], queryFn: brandApi.getAll, staleTime: 60000, enabled: showModal });
+  const { data: brandsResponse } = useQuery({ queryKey: ["discount-brands"], queryFn: () => brandApi.getOptions(), staleTime: 60000, enabled: showModal });
   const brands = useMemo(() => normalizeArrayResponse(brandsResponse), [brandsResponse]);
 
   useEffect(() => {

@@ -90,7 +90,7 @@ function useCategories() {
   return useQuery({ queryKey: ["storeEditor", "categories"], queryFn: adminCategoryApi.getAll, staleTime: 5 * 60 * 1000 });
 }
 function useBrands() {
-  return useQuery({ queryKey: ["storeEditor", "brands"], queryFn: adminBrandApi.getAll, staleTime: 5 * 60 * 1000 });
+  return useQuery({ queryKey: ["storeEditor", "brands"], queryFn: () => adminBrandApi.getOptions(), staleTime: 5 * 60 * 1000 });
 }
 function usePages() {
   return useQuery({ queryKey: ["storeEditor", "pages"], queryFn: pageApi.list, staleTime: 60 * 1000 });

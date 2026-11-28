@@ -4,6 +4,7 @@ const { checkPermission } = require("../middleware/checkPermission");
 const { limiters } = require("../middleware/rateLimit");
 const { 
   placeOrder, 
+  getMyOrdersSummary,
   getMyOrders, 
   getOrderById, 
   getAllOrders,          // ✅ Import
@@ -20,6 +21,7 @@ const router = express.Router();
 
 // User Routes
 router.post("/", authMiddleware.requireUser, limiters.orderCreate, placeOrder);
+router.get("/my/summary", authMiddleware.requireUser, getMyOrdersSummary);
 router.get("/my", authMiddleware.requireUser, getMyOrders);
 router.get("/:id", authMiddleware.requireUser, getOrderById);
 // ✅ User ke apne orders ke liye (edit + delete)
