@@ -59,7 +59,17 @@ test("Attribute: tenant-scoped with per-store unique code", () => {
   const Attribute = require("../models/Attribute");
   assert.equal(Attribute.schema.$tenantScopeField, "storeId");
   const indexes = Attribute.schema.indexes();
-  assert.ok(indexes.some(([k, o]) => k.storeId === 1 && k.code === 1 && k.is_deleted === 1 && o.unique));
+  // Soft-delete unique is partial on is_deleted:false (§3.3) — not {storeId,code,is_deleted}
+  assert.ok(
+    indexes.some(
+      ([k, o]) =>
+        k.storeId === 1 &&
+        k.code === 1 &&
+        !("is_deleted" in k) &&
+        o.unique &&
+        o.partialFilterExpression?.is_deleted === false,
+    ),
+  );
   assert.ok(!indexes.some(([k, o]) => o.unique && !("storeId" in k)));
 });
 

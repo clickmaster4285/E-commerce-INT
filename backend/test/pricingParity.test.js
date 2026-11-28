@@ -94,7 +94,14 @@ test("regular discount picks the same best price as the storefront rules", () =>
     { isActive: true, type: "fixed_price", value: 1, applyTo: "all" },
     { isActive: true, type: "percentage", value: 70, applyTo: "specific_tags" },
   ];
-  assert.deepEqual(bestRegularDiscount(1000, discounts, { productId: "p1", categoryId: "c1", brandId: "b1" }), { hasDiscount: true, originalPrice: 1000, discountedPrice: 850, savings: 150, discountName: "Flat" });
+  assert.deepEqual(bestRegularDiscount(1000, discounts, { productId: "p1", categoryId: "c1", brandId: "b1" }), {
+    hasDiscount: true,
+    originalPrice: 1000,
+    discountedPrice: 850,
+    savings: 150,
+    discountName: "Flat",
+    discountId: null,
+  });
   assert.equal(bestRegularDiscount(1000, discounts, { productId: "p2", brandId: "b2" }).discountedPrice, 500);
   assert.equal(bestRegularDiscount(999, discounts, { productId: "p2" }).discountedPrice, 899); // 899.1 → round
   assert.equal(bestRegularDiscount(100, [], {}).hasDiscount, false);
