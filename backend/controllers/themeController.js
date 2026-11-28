@@ -14,6 +14,7 @@ const { storeIdFor } = require("../utils/uploadPaths");
 const { publicTranslations, queueThemeTranslationSync } = require("../utils/themeTranslation");
 const crypto = require("crypto");
 const { extractLocaleRaw, normalizeLocale } = require("../utils/parseLocale");
+const AppError = require("../utils/AppError");
 
 // Preview links: random token (sirf hash DB me) — max itne active per store
 const MAX_PREVIEW_LINKS = 5;
@@ -73,7 +74,9 @@ const emitTheme = (req, event, payload) => {
 // ── PUBLIC: GET /theme/public — sirf published ──
 exports.getPublicTheme = async (req, res) => {
   try {
-    if (!req.store?._id) return fail(res, 404, "Store not found");
+    if (!req.store?._id) {
+      throw new AppError("Store not found", { status: 404, code: "STORE_NOT_FOUND" });
+    }
     const doc = await StoreTheme.findOne().select("published publishedVersion translations translationsUpdatedAt").lean();
     const version = doc?.publishedVersion || 0;
     // Translations publish ke baad async aate hain → ETag me unka stamp bhi

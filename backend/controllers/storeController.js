@@ -3,6 +3,7 @@ const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isA
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, pushStoreActivity, getChanges } = require("../utils/activityHelper");
 const { validatePhone } = require("../utils/phoneValidator");
+const { normalizeCountryCode, countryDisplayName } = require("../utils/geo");
 const log = require("../utils/logger");
 
 // @desc    Get Store Info
@@ -67,7 +68,10 @@ const updateStoreInfo = async (req, res) => {
       }
       store.support_phone = supportPhoneResult.sanitized;
     }
-    if (country !== undefined) store.country = country;
+    if (country !== undefined) {
+      const code = normalizeCountryCode(country);
+      store.country = code ? countryDisplayName(code) || String(country).trim() : "";
+    }
     if (state !== undefined) store.state = state;
     if (city !== undefined) store.city = city;
     if (zip_code !== undefined) store.zip_code = zip_code;

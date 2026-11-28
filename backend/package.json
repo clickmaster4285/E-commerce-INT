@@ -16,6 +16,8 @@
     "backfill:is-deleted": "node scripts/backfillIsDeleted.js",
     "backfill:address-store": "node scripts/backfillAddressStoreId.js",
     "backfill:product-summary": "node scripts/backfillProductSummary.js",
+    "backfill:stock-levels": "node scripts/backfillStockLevels.js",
+    "backfill:ledger-seed": "node scripts/backfillLedgerSeed.js",
     "migrate:run": "node scripts/migrations/run.js",
     "backfillSubdomains": "node scripts/backfillSubdomains.js --apply",
     "backfill:translations": "node scripts/backfillTranslations.js",

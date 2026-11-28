@@ -5,6 +5,7 @@ const PurchaseOrder = require("../models/PurchaseOrder");
 const PurchasePayment = require("../models/PurchasePayment");
 
 const { roundMoney } = require("../utils/roundMoney");
+const { readLedgerRange } = require("../services/financeRead");
 const positiveAmount = (value) => Math.max(0, Number(value) || 0);
 const toDate = (value) => {
   const date = value ? new Date(value) : null;
@@ -271,3 +272,22 @@ exports.getFinanceOverview = async (req, res) => {
     return res.status(500).json({ success: false, message: "Unable to load finance overview" });
   }
 };
+
+// Ledger slice — finance overview yahan shift ho sakta hai jab reporting stable ho
+exports.readLedgerRangeForStore = async (req, res) => {
+  try {
+    const storeId = req.store?._id;
+    if (!storeId) {
+      return res.status(404).json({ success: false, message: "Store not found" });
+    }
+    const from = req.query.from || req.query.startDate;
+    const to = req.query.to || req.query.endDate;
+    const { entries, balances } = await readLedgerRange(storeId, from, to);
+    return res.status(200).json({ success: true, data: { entries, balances } });
+  } catch (error) {
+    console.error("Finance ledger read error:", error);
+    return res.status(500).json({ success: false, message: "Unable to load ledger entries" });
+  }
+};
+
+exports._readLedgerRange = readLedgerRange;

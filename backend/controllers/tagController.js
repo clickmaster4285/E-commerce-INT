@@ -4,8 +4,9 @@ const Employee = require("../models/Employee");
 const mongoose = require("mongoose");
 const log = require("../utils/logger");
 const { escapeRegex } = require("../utils/escapeRegex");
+const { hydrate } = require("../utils/hydrate");
 
-// Helper to resolve user/employee info
+// Helper to resolve user/employee info (single id — create/update responses ke liye)
 const resolveCreator = async (userId) => {
   if (!userId) return null;
   try {
@@ -18,6 +19,31 @@ const resolveCreator = async (userId) => {
     return null;
   }
 };
+
+async function hydrateTagCreators(tags) {
+  let rows = await hydrate(tags, { field: "createdby", model: User, select: "name email" });
+  rows = await hydrate(rows, { field: "updatedby", model: User, select: "name email" });
+  const employeeIds = new Set();
+  for (const tag of rows) {
+    if (tag.createdby && mongoose.isValidObjectId(tag.createdby)) employeeIds.add(String(tag.createdby));
+    if (tag.updatedby && mongoose.isValidObjectId(tag.updatedby)) employeeIds.add(String(tag.updatedby));
+  }
+  if (!employeeIds.size) return rows;
+  const employees = await Employee.find({ _id: { $in: [...employeeIds] } })
+    .select("name email")
+    .lean();
+  const empMap = new Map(employees.map((e) => [String(e._id), { _id: e._id, name: e.name, email: e.email }]));
+  return rows.map((tag) => {
+    const out = { ...tag };
+    if (out.createdby && mongoose.isValidObjectId(out.createdby)) {
+      out.createdby = empMap.get(String(out.createdby)) || out.createdby;
+    }
+    if (out.updatedby && mongoose.isValidObjectId(out.updatedby)) {
+      out.updatedby = empMap.get(String(out.updatedby)) || out.updatedby;
+    }
+    return out;
+  });
+}
 
 // Helper function to generate slug from name
 const generateSlug = (text) => {
@@ -37,18 +63,7 @@ const getAllTags = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    // Manually resolve createdby/updatedby from User and Employee
-    const resolvedTags = await Promise.all(
-      tags.map(async (tag) => {
-        const createdbyInfo = await resolveCreator(tag.createdby);
-        const updatedbyInfo = await resolveCreator(tag.updatedby);
-        return {
-          ...tag,
-          createdby: createdbyInfo,
-          updatedby: updatedbyInfo,
-        };
-      })
-    );
+    const resolvedTags = await hydrateTagCreators(tags);
 
     return res.status(200).json(resolvedTags);
   } catch (error) {

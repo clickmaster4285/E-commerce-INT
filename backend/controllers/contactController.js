@@ -5,6 +5,7 @@
 const mongoose = require("mongoose");
 const ContactMessage = require("../models/ContactMessage");
 const { escapeRegex } = require("../utils/escapeRegex");
+const AppError = require("../utils/AppError");
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const fail = (res, status, message, extra = {}) => res.status(status).json({ success: false, message, ...extra });
@@ -31,10 +32,14 @@ function parseContact(body = {}) {
 // ── PUBLIC: POST /contact ──
 exports.submitMessage = async (req, res) => {
   try {
-    if (!req.store?._id) return fail(res, 404, "Store not found");
+    if (!req.store?._id) {
+      throw new AppError("Store not found", { status: 404, code: "STORE_NOT_FOUND" });
+    }
     const { errors, data } = parseContact(req.body);
     if (errors.spam) return res.status(200).json({ success: true }); // bot ko pata na chale
-    if (Object.keys(errors).length) return fail(res, 400, "Please check the form", { errors });
+    if (Object.keys(errors).length) {
+      throw new AppError("Please check the form", { status: 400, code: "VALIDATION_ERROR", details: { errors } });
+    }
     const doc = await ContactMessage.create(data);
     try {
       req.io?.emit("contactMessageCreated", { _id: doc._id }); // tenant room

@@ -4,24 +4,24 @@
 // Jo error `next(err)` tak pahunchta hai (CORS reject, multer, resolveStore DB
 // fail, JSON body parse error, ya koi bhi throw jo route ne pakda nahi) pehle
 // Express ka default HTML 500 page deta tha. Ab hamesha JSON:
-//   { success: false, code, message }
+//   { success: false, code, message, requestId [, details] }
 // Production me 500 ka asli message client ko nahi (Mongo internals leak),
 // sirf log me — reqId ke sath, taake support ticket se log dhoondha ja sake.
 // ==========================================================
 
 const log = require("../utils/logger");
-
-class AppError extends Error {
-  constructor(status, code, message, extra) {
-    super(message);
-    this.status = status;
-    this.code = code;
-    if (extra) this.extra = extra;
-  }
-}
+const AppError = require("../utils/AppError");
 
 function classify(err) {
-  if (err instanceof AppError) return { status: err.status, code: err.code, message: err.message, extra: err.extra };
+  if (err instanceof AppError) {
+    const extra = err.details && typeof err.details === "object" ? { ...err.details } : {};
+    return {
+      status: err.status ?? 400,
+      code: err.code ?? "BAD_REQUEST",
+      message: err.message,
+      extra: Object.keys(extra).length ? extra : undefined,
+    };
+  }
   // express.json() body parse
   if (err?.type === "entity.parse.failed") return { status: 400, code: "INVALID_JSON", message: "Request body is not valid JSON." };
   if (err?.type === "entity.too.large") return { status: 413, code: "PAYLOAD_TOO_LARGE", message: "Request body is too large." };
@@ -53,7 +53,13 @@ function classify(err) {
 // eslint-disable-next-line no-unused-vars
 function errorHandler(err, req, res, next) {
   const { status, code, message, extra } = classify(err);
-  const logPayload = { err, reqId: req.id, method: req.method, path: req.originalUrl, storeId: req.store?._id ? String(req.store._id) : undefined };
+  const logPayload = {
+    err,
+    reqId: req.id,
+    method: req.method,
+    path: req.originalUrl,
+    storeId: req.store?._id ? String(req.store._id) : undefined,
+  };
   if (status >= 500) log.error(logPayload, "Unhandled request error");
   else log.warn({ reqId: req.id, code, path: req.originalUrl }, message);
 

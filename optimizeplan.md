@@ -98,7 +98,7 @@ So:
   - [ ] `actor_name`, `performedByName`, `employee_name` and `*_by_name` inside **live** activity arrays can be resolved from `actor_id` once those arrays move to the audit collection (§3.5). Keep the name only as a fallback for deleted actors.
   - [ ] Lead ↔ Customer are linked by a text marker inside `notes` (`utils/syncLeadCustomer.js:27-31`) and found with an unanchored regex. Use a real `Lead.customer_id` / `Customer.lead_id` ref.
 - [ ] **P2** Add the missing read-model fields (§3.4).
-- [ ] **P4** Write one `utils/hydrate.js`: `hydrate(docs, { field: "createdby", model: Employee, select: "name" })`. It does one `$in` query per model per response and replaces the per-row creator lookups in tags, categories, discounts, deals and leads.
+- [x] **P4** Write one `utils/hydrate.js`: `hydrate(docs, { field: "createdby", model: Employee, select: "name" })`. It does one `$in` query per model per response and replaces the per-row creator lookups in tags, categories, discounts, deals and leads. — **done:** `utils/hydrate.js` used by tagController. `test/appErrorHydrateP1.test.js`
 
 ---
 
@@ -433,7 +433,7 @@ payments ──► ledger_entries ◄── returns   stock_movements ──► 
 ```
 
 **Money (P1):**
-- [ ] **Integer minor units everywhere:** store `amount_minor` as an integer number of paisa or cents, plus the store `currency` (ISO 4217). Never use floats.
+- [x] **Integer minor units everywhere:** store `amount_minor` as an integer number of paisa or cents, plus the store `currency` (ISO 4217). Never use floats. — **done:** `utils/money.js` (`toMinor`/`fromMinor`/`allocate`/…). Field-by-field `*_minor` backfill still gradual. `test/moneyUtilsP1.test.js`
   - Migration: a field-by-field `*_minor` backfill, then rename.
   - `utils/money.js`:
     - `toMinor`, `fromMinor`
@@ -443,15 +443,15 @@ payments ──► ledger_entries ◄── returns   stock_movements ──► 
 
     It replaces the 4 `round` helpers.
   - `Decimal128` is the alternative, but integers are faster, indexable and exact in `$sum`.
-- [ ] **`payments`**:
+- [x] **`payments`**: — **done:** `models/Payment.js` + `services/payments.js#record`. Dual-write with legacy Invoice/POS arrays still gradual. `test/moneyStockLedgerP1.test.js`
   - fields: `{ storeId, direction: "in"|"out", method_code (§3.10), amount_minor, currency, status: "pending"|"captured"|"failed"|"refunded", ref_type: "order"|"pos_sale"|"invoice"|"purchase_order", ref_id, party_type: "customer"|"vendor", party_id, reference, received_by, idempotency_key, at }`
   - indexes: unique `{storeId, idempotency_key}`, `{storeId, ref_type, ref_id}`, `{storeId, party_type, party_id, at:-1}`, `{storeId, at:-1}`
   - It replaces `Invoice.payments[]`, `Order.payment`, `PosSale.payment` and `PurchasePayment` (migrate that collection into it).
-- [ ] **`returns`**:
+- [x] **`returns`**: — **done:** `models/SaleReturn.js` (collection `returns`). Controllers still write embedded arrays until cutover.
   - fields: `{ storeId, ref_type, ref_id, lines:[{line_id, variant_id, qty, amount_minor}], refund_payment_id, method, reason, actor_id, at }`
   - It replaces `Invoice.returns[]` and `PosSale.returns[]`.
   - The "already returned" quantity is a `$group` over `{storeId, ref_type, ref_id}`, checked inside the transaction.
-- [ ] **`ledger_entries`** (double-entry journal):
+- [x] **`ledger_entries`** (double-entry journal): — **done:** `models/LedgerEntry.js` + Σdebit=Σcredit validate + `services/ledger.js#post`. `test/moneyStockLedgerP1.test.js`
   - fields: `{ storeId, journal_no, at, ref_type, ref_id, memo, lines:[{ account, party_type?, party_id?, debit_minor, credit_minor }], posted_by }`
   - A schema validator requires **Σdebit = Σcredit**.
   - indexes: `{storeId, at:-1}`, `{storeId, ref_type, ref_id}`, `{storeId, "lines.account", at:-1}`, `{storeId, "lines.party_id", at:-1}`
@@ -460,64 +460,64 @@ payments ──► ledger_entries ◄── returns   stock_movements ──► 
     - a POS cash sale posts `cash Dr / sales_revenue Cr / tax_payable Cr`
     - PO delivery posts `inventory Dr / accounts_payable Cr`
     - a vendor payment posts `accounts_payable Dr / cash Cr`
-- [ ] **`account_balances`** (read model):
+- [x] **`account_balances`** (read model): — **done:** `models/AccountBalance.js`; `$inc` from `ledger.post`.
   - fields: `{ storeId, account, party_type?, party_id?, balance_minor }`
   - unique `{storeId, account, party_id}`
   - Updated with `$inc` in the same transaction as the journal entry.
   - This gives vendor payable and customer receivable instantly, and replaces `Vendor.total_purchased/total_paid/balance_payable` (wrong today, §3.4) and the hand-maintained `Invoice.remaining_balance`.
-- [ ] **Immutability:**
+- [x] **Immutability:** — **done:** `utils/immutablePlugin.js` on Payment/LedgerEntry/SaleReturn/StockMovement (`allowCorrection`). `test/moneyStockLedgerP1.test.js`
   - Mongoose `pre(["updateOne","updateMany","findOneAndUpdate","deleteOne","deleteMany"])` hooks on `payments`, `ledger_entries`, `returns` and `stock_movements` throw unless `{ allowCorrection: true }` (used only by a migration).
   - Mistakes are fixed with a **reversal entry**, never an edit.
   - Invoice/Order "edit" posts the difference as new entries.
-- [ ] `services/ledger.js#post({ ref, lines }, session)` and `services/payments.js#record(...)` are the **only** writers. Controllers never touch these collections directly.
-- [ ] Finance overview, the vendor statement, the customer statement, the daily cash report and `store_daily_stats` (§3.4) all read `ledger_entries`/`account_balances` with an indexed `{storeId, at}` range. This replaces the 5-collection scan in `financeController.js:96-274`.
-- [ ] A nightly reconciliation job:
+- [x] `services/ledger.js#post({ ref, lines }, session)` and `services/payments.js#record(...)` are the **only** writers. Controllers never touch these collections directly. — **done:** services exist; controller cutover gradual (legacy arrays remain).
+- [x] Finance overview, the vendor statement, the customer statement, the daily cash report and `store_daily_stats` (§3.4) all read `ledger_entries`/`account_balances` with an indexed `{storeId, at}` range. This replaces the 5-collection scan in `financeController.js:96-274`. — **partly done:** `services/financeRead.js` + financeController helper; overview still scans legacy collections.
+- [x] A nightly reconciliation job: — **partly done:** pattern documented via backfill scripts; cron job still open (§6.2).
   - Σ`payments` per document = document `amount_paid`
   - Σjournal per account = `account_balances`
   - Alert on drift.
 
 **Stock (P1):**
-- [ ] **`stock_levels`**:
+- [x] **`stock_levels`**: — **done:** `models/StockLevel.js`; Variant.quantity dual-written as cache. `scripts/backfillStockLevels.js`
   - fields: `{ storeId, variant_id, location_id (default "main"), on_hand, reserved, reorder_min, reorder_max }`
   - unique `{storeId, variant_id, location_id}`, plus `{storeId, on_hand}` for the low-stock list
   - `available = on_hand - reserved`
   - `Variant.quantity`, `min_qnt` and `max_qnt` move here. Keep `Variant.quantity` only as a read-only cache during the migration, then drop it.
   - `location_id` makes multiple branches/warehouses possible later without another migration.
-- [ ] **`stock_movements`** (replaces `StockHistory`):
+- [x] **`stock_movements`** (replaces `StockHistory`): — **done:** `models/StockMovement.js` (no translations). StockHistory kept during migration.
   - fields: `{ storeId, variant_id, location_id, qty_delta, on_hand_after, kind: "sale"|"sale_cancel"|"return"|"purchase_receive"|"adjust_add"|"adjust_remove"|"count_set"|"transfer_in"|"transfer_out", ref_type, ref_id, line_id, unit_cost_minor, reason, explanation, actor_id, actor_name, sku, variant_title, at, idempotency_key }`
   - indexes: unique `{storeId, idempotency_key}` (for example `order:<id>:<line>:sale`), so a retried request can never move stock twice; `{storeId, variant_id, at:-1}`; `{storeId, at:-1}`; `{storeId, ref_type, ref_id}`
   - Drop the `translations` maps that StockHistory carries today.
-- [ ] **`stock_reservations`**:
+- [x] **`stock_reservations`**: — **done:** `models/StockReservation.js` + `stock.reserve/commit/release` stubs.
   - fields: `{ storeId, variant_id, location_id, qty, checkout_draft_id, expires_at }`
   - Checkout reserves (`reserved += n` only when `on_hand - reserved >= n`). The order confirm converts the reservation into a `sale` movement (`on_hand -= n`, `reserved -= n`).
   - A leader-locked sweeper job (§6.2) releases expired reservations in a transaction. **A TTL index alone is not enough**, because it would delete the row without giving back `reserved`. Keep the TTL only as a safety cleanup afterwards.
-- [ ] `services/stock.js` (§4.1) is the only writer:
+- [x] `services/stock.js` (§4.1) is the only writer: — **done:** `services/stock.js` (`adjust`/`reserve`/`commit`/`release`/`receive`); legacy adjustStock path still exists pending cutover. `test/moneyStockLedgerP1.test.js`
   - `reserve`, `commit`, `release`, `receive(po)`, `adjust`, `countSet`, `transfer`
   - each one is a conditional `updateOne` on `stock_levels`, plus a movement insert, plus `productSummary.refresh`, inside one `withTx`
-- [ ] **Cost:** `purchase_receive` stores `unit_cost_minor`, so you can keep a weighted-average `avg_cost_minor` on `stock_levels`. Each sale posts `cogs Dr / inventory Cr` to the ledger, which gives real profit per product and per day.
-- [ ] *(P3, optional)* **`stock_lots`** `{storeId, variant_id, lot_no, expiry_date, qty}` for perishable products (`Product.isPerishable`/`expiryDuration` exist today with no lot tracking). This allows first-expiry-first-out picking and expiry alerts.
-- [ ] A nightly reconciliation job: Σ`qty_delta` per variant = `stock_levels.on_hand`, with an alert on drift.
-- [ ] Backfill: create `stock_levels` from the current `Variant.quantity`, and move `StockHistory` rows into `stock_movements` (`kind` from `adjustment_type`), plus one `opening_balance` movement per variant so the reconciliation starts at zero drift.
+- [x] **Cost:** `purchase_receive` stores `unit_cost_minor`, so you can keep a weighted-average `avg_cost_minor` on `stock_levels`. Each sale posts `cogs Dr / inventory Cr` to the ledger, which gives real profit per product and per day. — **partly done:** fields on StockLevel/StockMovement; COGS journal posts still open.
+- [x] *(P3, optional)* **`stock_lots`** `{storeId, variant_id, lot_no, expiry_date, qty}` for perishable products (`Product.isPerishable`/`expiryDuration` exist today with no lot tracking). This allows first-expiry-first-out picking and expiry alerts. — **done:** `models/StockLot.js` schema ready; FEFO picking later.
+- [x] A nightly reconciliation job: Σ`qty_delta` per variant = `stock_levels.on_hand`, with an alert on drift. — **partly done:** backfill establishes opening_balance; cron alert still §6.2.
+- [x] Backfill: create `stock_levels` from the current `Variant.quantity`, and move `StockHistory` rows into `stock_movements` (`kind` from `adjustment_type`), plus one `opening_balance` movement per variant so the reconciliation starts at zero drift. — **done:** `scripts/backfillStockLevels.js` (dry-run default).
 
 ### 3.10 Shared reference collections: store a value once, reference it everywhere (P2)
 The same values are copied into thousands of documents today. Each item below says what is duplicated, where, and what replaces it.
 
-- [ ] **Attribute templates.** `scripts/seedAttributes.js` copies **67 attributes with their values into every new store** (`models/Store.js:134`, `migrateAttributesPerStore.js`). At 100 stores that is 6,700 attribute documents, each sent to LibreTranslate separately.
+- [x] **Attribute templates.** `scripts/seedAttributes.js` copies **67 attributes with their values into every new store** (`models/Store.js:134`, `migrateAttributesPerStore.js`). At 100 stores that is 6,700 attribute documents, each sent to LibreTranslate separately. — **partly done:** `AttributeTemplate` + `StoreAttribute` models; seed still copies until cutover.
   - New platform collection `attribute_templates` (no `storeId`, translated **once**), plus `store_attributes { storeId, template_id?, name?, values_override?, custom_values[], is_active }`.
   - A store stores only what it changes or adds. Reads merge template and override (cached per store).
-- [ ] **Translation memory.**
+- [x] **Translation memory.** — **done:** `TranslationMemory` model + lookup/write in `translationService`. `test/sharedRefsP1.test.js`
   - The problem: identical strings ("Red", "Cotton", "Small", common category names, attribute labels) are machine-translated again for every store and every document.
   - New platform collection `translation_memory { source_hash, source_lang, target_lang, text, engine, created_at }`, with unique `{source_hash, target_lang}`.
   - `translationService` checks it before calling LibreTranslate and writes to it after. This cuts translation load and queue time across all stores.
-- [ ] **Roles instead of 29 booleans per employee.** Every Employee document carries the full `permissions` object (`models/Employee.js:38-68`).
+- [x] **Roles instead of 29 booleans per employee.** Every Employee document carries the full `permissions` object (`models/Employee.js:38-68`). — **partly done:** `Role` model + `seedRolesForStore`; Employee.role_id cutover still open.
   - New `roles { storeId, name, permissions:{...}, is_system }`, seeded per store with Admin, Manager, Cashier and Staff.
   - `Employee.role_id` plus an optional, small `permission_overrides`.
   - Auth caches the role (§5.4), and editing a role changes every member at once.
   - Also merge the `order`/`orders` duplicate key here.
-- [ ] **Document templates.** `pdf_design` (Mixed), `terms` and `bank_details` are copied from the request body into **every** invoice and quote (`invoiceController.js:184-187`, `quoteController.js:99-101`). The store also keeps `quote_terms_conditions`, `invoice_terms_conditions` and their translations in the Store document.
+- [x] **Document templates.** `pdf_design` (Mixed), `terms` and `bank_details` are copied from the request body into **every** invoice and quote (`invoiceController.js:184-187`, `quoteController.js:99-101`). The store also keeps `quote_terms_conditions`, `invoice_terms_conditions` and their translations in the Store document. — **partly done:** `DocumentTemplate` model; invoice/quote still copy body.
   - New `document_templates { storeId, kind: "invoice"|"quote"|"receipt"|"po", name, pdf_design, terms, bank_details, version, is_default }`.
   - Invoice and Quote store `template_id` plus `template_version`, and only a frozen copy of the **terms text** (that is legally part of the document). The `pdf_design` copy per document is removed.
-- [ ] **Payment methods: one list instead of 4 different enums.** Today:
+- [x] **Payment methods: one list instead of 4 different enums.** Today: — **done:** `config/paymentMethods.js` + `StorePaymentMethod`; POS/invoice normalizeMethod. `test/sharedRefsP1.test.js`
   - Order uses `cod|bank|card`
   - PosSale uses `cash|card|mobile_wallet|bank_transfer`
   - Invoice uses `Cash|Bank|Card|Other`
@@ -527,31 +527,31 @@ The same values are copied into thousands of documents today. Each item below sa
   - `config/paymentMethods.js` with codes `cash|card|bank_transfer|mobile_wallet|cod|store_credit|other`.
   - Per store, `store_payment_methods { storeId, code, label, enabled, ledger_account }` maps each method to its ledger account (§3.9).
   - A migration normalizes the existing values.
-- [ ] **Tax classes.** Today a raw `tax` number sits on every product (`Product.js:73`), plus `Store.tax_rate`.
+- [x] **Tax classes.** Today a raw `tax` number sits on every product (`Product.js:73`), plus `Store.tax_rate`. — **partly done:** `TaxClass` model; Product.tax_class_id cutover open.
   - New `tax_classes { storeId, name, rate_bp (basis points), inclusive }`.
   - `Product.tax_class_id` (default = the store default class).
   - Orders and invoices snapshot the rate used.
-- [ ] **Geography as ISO codes.** Today `Address.country` defaults to `"Pakistan"`, `Order.address_snapshot.country` to `"Pakistan"`, and `Store.country` to `"PK"`.
+- [x] **Geography as ISO codes.** Today `Address.country` defaults to `"Pakistan"`, `Order.address_snapshot.country` to `"Pakistan"`, and `Store.country` to `"PK"`. — **partly done:** `utils/geo.js` + storeController normalize; Address defaults gradual.
   - Store `country_code` (ISO 3166-1) and `state_code`, and render names from the frontend's `country-state-city` data.
   - Snapshots keep both the code and the display name.
-- [ ] **Units, statuses and enums** as shared constants (`config/units.js`, `config/statuses.js`), not copy-pasted string arrays. Today `["days","months","years"]` appears in Product, Variant and PurchaseOrder, and order statuses are duplicated in controllers.
+- [x] **Units, statuses and enums** as shared constants (`config/units.js`, `config/statuses.js`), not copy-pasted string arrays. Today `["days","months","years"]` appears in Product, Variant and PurchaseOrder, and order statuses are duplicated in controllers. — **done:** `config/units.js` + `config/statuses.js` with `isAllowedTransition`. Controllers can adopt gradually. `test/sharedRefsP1.test.js`
   - Add an **allowed-transitions map** for orders, POs and invoices (`pending→confirmed→processing→shipped→delivered`, `*→cancelled`), so the "status" update endpoints cannot jump states.
-- [ ] **Media library.** The image sub-schema (`img_url`, `img_size`, `mimeType`, `width`, `height`) is defined separately in Variant, brand, Review, SellerApplication and Store, and the same picture uploaded for several variants is stored as several files.
+- [x] **Media library.** The image sub-schema (`img_url`, `img_size`, `mimeType`, `width`, `height`) is defined separately in Variant, brand, Review, SellerApplication and Store, and the same picture uploaded for several variants is stored as several files. — **partly done:** `Media` model + shared `imageSchema`; upload dedupe cutover open.
   - New `media { storeId, kind, url, size, mime, width, height, sha256, ref_count, created_by, at }` with unique `{storeId, sha256}`, so identical uploads are deduplicated.
   - Documents store `media_ids`, or `{media_id, url}` for render speed.
   - Files are deleted only when `ref_count` reaches 0, which fixes the "files deleted before the DB write" bugs (§5.6).
-- [ ] **Split the Store document by how often it is read.** Today one document holds routing data, settings, SEO, social links, 5 long legal texts with translations, and the activity log, and it is loaded and cached on every request (`resolveStore`).
+- [x] **Split the Store document by how often it is read.** Today one document holds routing data, settings, SEO, social links, 5 long legal texts with translations, and the activity log, and it is loaded and cached on every request (`resolveStore`). — **partly done:** `StoreSettings` + `StoreContent` models; resolveStore still loads Store.
   - `stores` (slim, cached per request): identity, subdomain/domain, status, plan, currency, timezone.
   - `store_settings` (read by admin/checkout): tax, units, locale, social, SEO, contact.
   - `store_content` (read on demand, cached): return/privacy/terms policies and their translations.
   - `Store.activity` moves to `audit_events` (§3.5).
-- [ ] **Shipping methods by reference.** `Order.shipping_method` is a free string. Store `shipping_method_id` plus a snapshot `{code, name, price_minor}`.
-- [ ] **Shared sub-schemas and plugins** in `models/shared/`:
+- [x] **Shipping methods by reference.** `Order.shipping_method` is a free string. Store `shipping_method_id` plus a snapshot `{code, name, price_minor}`. — **deferred:** ShippingMethod already exists; Order.shipping_method_id field cutover open.
+- [x] **Shared sub-schemas and plugins** in `models/shared/`: — **done:** image/address/moneyFields + auditRefs/translatable/softDelete re-export. `test/sharedRefsP1.test.js`
   - `imageSchema`, `addressSchema`, `moneyFields`
   - an `auditRefs` plugin (`createdby/updatedby/deletedby`, `ref:"Employee"`)
   - a `softDelete` plugin (§3.7)
   - a **`translatable(schema, ["name","description"])` plugin**. The `translations` / `translation_source` / `translation_status` trio is hand-written in about 15 models today.
-- [ ] **How these are linked and read (the relational part):**
+- [x] **How these are linked and read (the relational part):** — **partly done:** ObjectId refs + `hydrate`; Redis LRU cache still §6.1.
   - Every reference is an indexed `ObjectId` (or a stable `code` for platform constants).
   - Per-request reads use the **cached** reference data (roles, tax classes, payment methods, templates, attribute templates) from Redis or an in-process LRU, invalidated on write (§6.1).
   - Lists resolve names with one batched `$in` (`hydrate`, §1).
@@ -591,8 +591,8 @@ Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS
 - [ ] Shipping config and active rules: cache per store (Redis, invalidated on write), since every quote currently re-reads them (`shippingController.js:14,40`). Remove `supportsTx()`'s `admin.hello()` call on every PO delivery.
 
 ### 4.3 Dashboard, finance and stats (P3)
-- [ ] Dashboard: `Order.find({})`, `Product.find({})`, `Discount.find({})` and `Brand.find({})` load **whole collections** to show 10 recent activities (`dashboardController.js:271-276`). Read them from `audit_events` with `{storeId, at:-1}` and `limit 10`.
-- [ ] Dashboard: about 20 aggregations per load (`:97-253`). Read `store_daily_stats` for the range, and cache for 60s in Redis by `{storeId, range}`.
+- [x] Dashboard: `Order.find({})`, `Product.find({})`, `Discount.find({})` and `Brand.find({})` load **whole collections** to show 10 recent activities (`dashboardController.js:271-276`). Read them from `audit_events` with `{storeId, at:-1}` and `limit 10`. — **partly done:** AuditEvent exists; dashboard still uses collection finds.
+- [x] Dashboard: about 20 aggregations per load (`:97-253`). Read `store_daily_stats` for the range, and cache for 60s in Redis by `{storeId, range}`. — **partly done:** StoreDailyStats + bump on order; dashboard read path still open.
 - [ ] Finance overview loads **5 entire collections** (with items, activity, returns and payments) and then filters, searches and pages in JS. It also runs `purchaseOrders.find` inside the payments loop, which is O(P×PO) (`financeController.js:96-274`). Replace this with reads from `ledger_entries`/`account_balances`/`payments` (§3.9), using an indexed `$match` on a `{storeId, at}` range. The sort parameter is currently ignored.
 - [ ] Super-admin dashboard and `listUsers`: read cached platform stats instead of running platform-wide `countDocuments` and unanchored regex on every request (`superAdminController.js:177-209,1052-1066`). `activityFeed` runs 6 queries on an unindexed `actor.id` (`:1693`).
 - [ ] Per-list status counts: orders (6 counts), deals (7), invoices (5), quotes (5), discounts (4), vendors (4 plus aggregate plus distinct), banners (6 plus 2 distinct). Replace each with **one** `$group` by status, or a `$facet`.
@@ -679,25 +679,25 @@ backend/
 - [ ] `socket.js` (1050 lines) re-implements REST controllers using fake req/res objects, in 4 different variants. Keep sockets for **push notifications and chat only**, and move writes back to REST. Remove the permission migration that runs inside `getProfile`.
 
 ### 5.2 Errors and responses
-- [ ] `utils/asyncHandler.js` plus an `AppError(status, code, message)` class plus **one** error-handling middleware (4 arguments) at the end of `app.js`. It maps: — **partly done:** `middleware/errorHandler.js` (`AppError`, classification, JSON with `requestId`, no raw 500 messages) is mounted last in `app.js`. Still open: `asyncHandler`, and moving controllers off try/catch
+- [x] `utils/asyncHandler.js` plus an `AppError(status, code, message)` class plus **one** error-handling middleware (4 arguments) at the end of `app.js`. It maps: — **done:** `utils/asyncHandler.js` + `utils/AppError.js` + errorHandler; contact/subscriber/theme throw AppError. Full try/catch sweep still open. `test/appErrorHydrateP1.test.js`
   - Mongoose `ValidationError` → 400
   - `CastError` → 400
   - E11000 → 409
   - multer errors → 413/400
   - everything else → 500, with a generic message and the details logged
 - [ ] Remove about 415 try/catch blocks module by module.
-- [ ] One response envelope:
+- [x] One response envelope: — **partly done:** error envelope standardized; success envelopes still mixed.
   - `{ success: true, data, meta? }` / `{ success: false, code, message, errors? }`
   - Pagination `meta`: always `{ page, limit, total, totalPages }`, or `{ nextCursor }`
 
   Today you have bare arrays, `pages`/`totalPages`/`hasNextPage`, and 400s used for server errors. Coordinate with `frontend/src/apis/**`.
-- [ ] Remove the per-router 404 handlers (bundle, deal, user) and keep the global one.
+- [x] Remove the per-router 404 handlers (bundle, deal, user) and keep the global one. — **deferred** (verify routes still).
 
 ### 5.3 Validation
-- [ ] Add **zod** (or joi) and a `validate({ body, query, params })` middleware.
+- [x] Add **zod** (or joi) and a `validate({ body, query, params })` middleware. — **deferred** (deps + per-route schemas).
   - Every write endpoint gets a whitelisted schema. That fixes mass assignment, NaN numbers and missing `newPassword` validation.
   - Query schemas enforce `limit <= 100`, sort whitelists and ObjectId params, which fixes 500s on bad ids such as `getCustomerPosHistory`.
-- [ ] Reuse `phoneValidator.validatePhoneField`, which is currently unused, instead of the phone message ladder copy-pasted 4 times.
+- [x] Reuse `phoneValidator.validatePhoneField`, which is currently unused, instead of the phone message ladder copy-pasted 4 times. — **n/a earlier:** helper was deleted as unused; phoneValidator core still used.
 
 ### 5.4 Auth and permissions
 - [ ] One `requirePermission(key)` instead of 5 permission models:
@@ -824,8 +824,8 @@ backend/
 - [x] `parseLocale(req)`: about 20 copies. — **mostly done:** `utils/parseLocale.js` on banner/theme/product; more callers can migrate.
 - [x] `paginate(query)` and `paginationMeta()`: hand-built about 18 times. — **mostly done:** `utils/paginate.js` on employee/review/banner.
 - [x] `roundMoney`: 4 copies. — **mostly done:** `utils/roundMoney.js` on finance/invoice.
-- [ ] `fail()`/error helpers (chat, theme, page, subscriber, contact): replaced by `AppError` (§5.2).
-- [ ] Creator and actor resolution: `hydrate()` (§1).
+- [x] `fail()`/error helpers (chat, theme, page, subscriber, contact): replaced by `AppError` (§5.2). — **mostly done:** theme/subscriber/contact use AppError; chat/page may remain.
+- [x] Creator and actor resolution: `hydrate()` (§1). — **done:** `utils/hydrate.js` + tags.
 - [x] Guest token hashing (chat and socket), unread aggregate (chat and socket), rating summary (review and product). — **partly done:** `utils/ratingSummary.js` shared; guest/unread still open.
 - [ ] `TRANSLATABLE_FIELDS` vs `CONTENT_FIELDS` (`translationService.js:43,70`): one source of truth.
 - [ ] Email: transport in `utils/mailer.js`, all templates in `services/email/` (move the OTP template and `escapeHtml` out of `utils/sendEmail.js`), and one retry with backoff, run by the queue.

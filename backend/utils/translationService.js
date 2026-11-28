@@ -36,7 +36,8 @@
 const crypto = require("crypto");
 const log = require("./logger");
 const { escapeRegex } = require("./escapeRegex");
-const { TARGET_LOCALES, isEnabled, translateBatch } = require("./libreTranslate");
+const { TARGET_LOCALES, isEnabled, translateBatch, SOURCE_LANG } = require("./libreTranslate");
+const TranslationMemory = require("../models/TranslationMemory");
 
 // ==========================================
 // WHICH FIELDS GET TRANSLATED (per model)
@@ -110,6 +111,71 @@ function hashText(value) {
   const text = String(value ?? "").trim();
   if (!text) return "";
   return crypto.createHash("md5").update(text).digest("hex").slice(0, 12);
+}
+
+/** Translation memory ke liye poora md5 (§3.10) */
+function sourceHashFull(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  return crypto.createHash("md5").update(text).digest("hex");
+}
+
+/** Pehle memory dekho — LibreTranslate par load kam */
+async function lookupTranslationMemory(texts, targetLang) {
+  const unique = [...new Set(texts.map((t) => String(t ?? "").trim()).filter(Boolean))];
+  if (!unique.length) return new Map();
+
+  const hashes = unique.map(sourceHashFull).filter(Boolean);
+  const rows = await TranslationMemory.find({
+    source_hash: { $in: hashes },
+    target_lang: String(targetLang).toLowerCase(),
+  }).lean();
+
+  const byHash = new Map(rows.map((row) => [row.source_hash, row.text]));
+  const hits = new Map();
+  for (const text of unique) {
+    const hash = sourceHashFull(text);
+    const hit = byHash.get(hash);
+    if (hit) hits.set(text, String(hit).trim());
+  }
+  return hits;
+}
+
+/** Successful LT results ko memory me likho — fire-and-forget */
+function rememberTranslationMemory(pairs, targetLang) {
+  const target = String(targetLang).toLowerCase();
+  const source = String(SOURCE_LANG || "en").toLowerCase();
+  const entries = pairs
+    .map(({ text, translated }) => {
+      const source_hash = sourceHashFull(text);
+      const out = String(translated ?? "").trim();
+      if (!source_hash || !out) return null;
+      return {
+        source_hash,
+        source_lang: source,
+        target_lang: target,
+        text: out,
+        engine: "libretranslate",
+      };
+    })
+    .filter(Boolean);
+
+  if (!entries.length) return;
+
+  setImmediate(() => {
+    TranslationMemory.bulkWrite(
+      entries.map((doc) => ({
+        updateOne: {
+          filter: { source_hash: doc.source_hash, target_lang: doc.target_lang },
+          update: { $set: doc },
+          upsert: true,
+        },
+      })),
+      { ordered: false },
+    ).catch((err) => {
+      log.debug("[translationMemory] write skip:", err?.message || err);
+    });
+  });
 }
 
 /**
@@ -468,13 +534,31 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
       );
       if (!textsForLocale.length) continue;
 
-      const translated = await translateBatch(textsForLocale, locale);
-      if (translated === null) {
-        failed = true;
-        break;
+      let memoryHits = new Map();
+      try {
+        memoryHits = await lookupTranslationMemory(textsForLocale, locale);
+      } catch (memErr) {
+        log.debug("[translationMemory] lookup skip:", memErr?.message || memErr);
       }
-      const bySource = new Map();
-      textsForLocale.forEach((text, i) => bySource.set(text, String(translated[i] ?? "").trim()));
+
+      const needTranslate = textsForLocale.filter((text) => !memoryHits.has(text));
+      let batchOut = [];
+
+      if (needTranslate.length) {
+        const translated = await translateBatch(needTranslate, locale);
+        if (translated === null) {
+          failed = true;
+          break;
+        }
+        batchOut = translated;
+        rememberTranslationMemory(
+          needTranslate.map((text, i) => ({ text, translated: batchOut[i] })),
+          locale,
+        );
+      }
+
+      const bySource = new Map(memoryHits);
+      needTranslate.forEach((text, i) => bySource.set(text, String(batchOut[i] ?? "").trim()));
       results.set(locale, bySource);
     }
   }

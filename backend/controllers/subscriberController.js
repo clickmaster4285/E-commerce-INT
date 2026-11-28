@@ -4,6 +4,7 @@
 
 const mongoose = require("mongoose");
 const Subscriber = require("../models/Subscriber");
+const AppError = require("../utils/AppError");
 
 const fail = (res, status, message, extra = {}) => res.status(status).json({ success: false, message, ...extra });
 
@@ -14,9 +15,13 @@ const normalizeEmail = (v) => String(v || "").trim().toLowerCase().slice(0, 254)
 // Pehle se subscribed ho to bhi 200 (email enumerate na ho sake)
 exports.subscribe = async (req, res) => {
   try {
-    if (!req.store?._id) return fail(res, 404, "Store not found");
+    if (!req.store?._id) {
+      throw new AppError("Store not found", { status: 404, code: "STORE_NOT_FOUND" });
+    }
     const email = normalizeEmail(req.body?.email);
-    if (!Subscriber.EMAIL_PATTERN.test(email)) return fail(res, 400, "Please enter a valid email address");
+    if (!Subscriber.EMAIL_PATTERN.test(email)) {
+      throw new AppError("Please enter a valid email address", { status: 400, code: "INVALID_EMAIL" });
+    }
     const locale = String(req.body?.locale || "en").slice(0, 10);
     // Kahan se aaya (allowlist) — newsletter section ya store editor popup
     const source = ["newsletter_section", "popup", "footer"].includes(req.body?.source) ? req.body.source : "newsletter_section";

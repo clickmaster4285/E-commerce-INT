@@ -9,6 +9,7 @@ const addressSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    // Default display name; normalize via utils/geo.normalizeCountryCode when validating input
     country: { type: String, default: "Pakistan", trim: true },
     full_name: { type: String, required: true, trim: true },
     street_address1: { type: String, required: true, trim: true },

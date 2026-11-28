@@ -437,7 +437,9 @@ exports.recordPayment = async (req, res) => {
   try {
     const amount = Number(req.body.amount);
     const paymentDate = new Date(req.body.payment_date);
-    const method = String(req.body.payment_method || "").trim();
+    const rawMethod = String(req.body.payment_method || "").trim();
+    const { normalizeMethod, toInvoicePaymentLabel } = require("../config/paymentMethods");
+    const method = toInvoicePaymentLabel(normalizeMethod(rawMethod));
     if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, message: "Payment amount must be greater than zero" });
     if (Number.isNaN(paymentDate.getTime())) return res.status(400).json({ success: false, message: "Enter a valid payment date" });
     if (!["Cash", "Bank", "Card", "Other"].includes(method)) return res.status(400).json({ success: false, message: "Choose a valid payment method" });

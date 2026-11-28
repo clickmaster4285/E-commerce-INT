@@ -603,8 +603,10 @@ const savePosSale = async (req, res, existingSale = null) => {
     const finalDiscount = Math.min(itemDiscountTotal + discountAmount, finalSubtotal + finalTax);
     const total = Math.max(0, Math.round(finalSubtotal + finalTax - finalDiscount));
 
-    let paymentMethod = String(payment_method || "cash").toLowerCase();
-    if (!["cash", "card", "mobile_wallet", "bank_transfer"].includes(paymentMethod)) {
+    const { normalizeMethod, isPaymentMethodCode } = require("../config/paymentMethods");
+    let paymentMethod = normalizeMethod(payment_method || "cash");
+    const posCodes = ["cash", "card", "mobile_wallet", "bank_transfer"];
+    if (!isPaymentMethodCode(paymentMethod) || !posCodes.includes(paymentMethod)) {
       paymentMethod = "cash";
     }
     if (["card", "bank_transfer"].includes(paymentMethod) && !String(reference || "").trim()) {
